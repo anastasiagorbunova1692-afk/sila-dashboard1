@@ -110,8 +110,16 @@ export default function MtdBlock({ allData }: Props) {
         Данные с 1-го по {currentDay}-е число каждого месяца
       </p>
 
-      {/* Table */}
-      <div className="overflow-x-auto mb-6">
+      {/* Table — max 5 rows visible, rest scrollable */}
+      <div
+        className="overflow-x-auto mb-1"
+        style={{
+          maxHeight: 260,
+          overflowY: 'auto',
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(124,58,237,0.5) transparent',
+        }}
+      >
         <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -168,7 +176,15 @@ export default function MtdBlock({ allData }: Props) {
         </table>
       </div>
 
-      {/* Bar chart */}
+      {/* "More months" hint */}
+      {months.length > 5 && (
+        <p className="text-xs mb-5" style={{ color: '#8888aa' }}>
+          ↓ ещё {months.length - 5} {months.length - 5 === 1 ? 'месяц' : months.length - 5 < 5 ? 'месяца' : 'месяцев'}
+        </p>
+      )}
+      {months.length <= 5 && <div className="mb-5" />}
+
+      {/* Bar chart — always shows ALL months */}
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
