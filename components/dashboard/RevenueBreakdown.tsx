@@ -27,7 +27,7 @@ function ProgressSection({ title, rows }: { title: string; rows: BarRow[] }) {
               <div className="flex items-center gap-3">
                 <span className="text-sm" style={{ color: '#f0f0ff' }}>{c.display}</span>
                 <span className="text-xs w-10 text-right" style={{ color: '#8888aa' }}>
-                  {c.pct > 0 ? c.pct.toFixed(1) + '%' : '—'}
+                  {c.pct.toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -61,7 +61,6 @@ export default function RevenueBreakdown({ data }: Props) {
     { label: 'Сертификаты', display: formatRub(data.reduce((s, r) => s + (r.revenueCerts  ?? 0), 0)), pct: total > 0 ? data.reduce((s, r) => s + (r.revenueCerts  ?? 0), 0) / total * 100 : 0 },
     { label: 'Абонементы',  display: formatRub(data.reduce((s, r) => s + (r.revenueAbos   ?? 0), 0)), pct: total > 0 ? data.reduce((s, r) => s + (r.revenueAbos   ?? 0), 0) / total * 100 : 0 },
   ]
-    .filter((c) => c.pct > 0)
     .sort((a, b) => b.pct - a.pct)
 
   const clientRows: BarRow[] = [
