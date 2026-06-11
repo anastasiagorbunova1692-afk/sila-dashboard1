@@ -85,45 +85,40 @@ async function fetchSheet(sheetName: string, range?: string): Promise<unknown[][
   return rows
 }
 
-// ── Month column detection ───────────────────────────────────────────────────
-//
-// The vertical sheets (DB_Finance etc.) have a header row where column A is
-// "Показатель" and the month columns can start at any arbitrary column.
-// This function scans the header row and returns a map of { monthName → colIndex }.
-// All subsequent value lookups use this map instead of hardcoded offsets.
+// ── Analytics helpers ────────────────────────────────────────────────────────
 
-const MONTHS = ['окт.25', 'ноя.25', 'дек.25', 'янв.26', 'фев.26', 'март.26', 'апр.26', 'май.26']
+// Month pattern: matches "окт.25", "ноя.25", "март.26", etc.
+const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.?\s*\d{2}$/i
 
-function normaliseMonthLabel(v: unknown): string {
-  if (v === null || v === undefined) return ''
-  // Sheets sometimes delivers Cyrillic month names with a trailing dot already,
-  // or with slightly different spacing — normalise to lowercase trimmed.
-  return String(v).trim().toLowerCase()
-}
-
-function buildMonthIndex(headerRow: unknown[]): Map<string, number> {
-  const idx = new Map<string, number>()
-  headerRow.forEach((cell, col) => {
-    const label = normaliseMonthLabel(cell)
-    // Match against each expected month (also normalised)
-    MONTHS.forEach((m) => {
-      if (label === m.toLowerCase()) idx.set(m, col)
-    })
+// Scan header row and return { 'окт.25': 9, 'ноя.25': 10, ... }
+// Normalises cell values so "Окт.25", "окт.25", "окт 25" all match.
+function detectMonthColumns(headerRow: unknown[]): Record<string, number> {
+  const cols: Record<string, number> = {}
+  headerRow.forEach((cell, idx) => {
+    const raw = cell === null || cell === undefined ? '' : String(cell).trim()
+    // Normalise: lowercase, collapse spaces, ensure single dot before year
+    const norm = raw.toLowerCase().replace(/\s+/g, '.').replace(/\.+/g, '.')
+    if (MONTH_PATTERN.test(norm)) {
+      cols[norm] = idx
+    }
   })
-  return idx
+  return cols
 }
 
-// Returns value for a given month from a data row using the pre-built column map.
-function gv(
-  rows: unknown[][],
-  rowIdx: number,
-  month: string,
-  monthIdx: Map<string, number>
-): number | null {
-  const col = monthIdx.get(month)
-  if (col === undefined) return null
-  const row = rows[rowIdx]
+// Find the row whose column-0 label contains all of the given keywords (case-insensitive).
+function findRow(rows: unknown[][], ...keywords: string[]): unknown[] | null {
+  for (const row of rows) {
+    const label = row[0] === null || row[0] === undefined ? '' : String(row[0]).toLowerCase()
+    if (keywords.every((kw) => label.includes(kw.toLowerCase()))) return row
+  }
+  return null
+}
+
+// Extract a value from `row` at the column for `month`.
+function pick(row: unknown[] | null, month: string, cols: Record<string, number>): number | null {
   if (!row) return null
+  const col = cols[month]
+  if (col === undefined) return null
   return parseSheetsValue(row[col])
 }
 
@@ -182,69 +177,142 @@ export async function fetchAnalytics(): Promise<MonthlyData[]> {
   const exp  = expRes.status  === 'fulfilled' ? expRes.value  : []
   const cli  = cliRes.status  === 'fulfilled' ? cliRes.value  : []
 
-  // Row 0 is the header row — find month columns dynamically for each sheet.
-  const finIdx  = fin.length  ? buildMonthIndex(fin[0]  as unknown[]) : new Map<string, number>()
-  const prodIdx = prod.length ? buildMonthIndex(prod[0] as unknown[]) : new Map<string, number>()
-  const expIdx  = exp.length  ? buildMonthIndex(exp[0]  as unknown[]) : new Map<string, number>()
-  const cliIdx  = cli.length  ? buildMonthIndex(cli[0]  as unknown[]) : new Map<string, number>()
+  // ── Debug logs (visible in browser console) ──
+  console.log('[analytics] DB_Finance rows:', fin.length)
+  console.log('[analytics] DB_Finance header:', JSON.stringify(fin[0]))
+  console.log('[analytics] DB_Finance row[2]:', JSON.stringify(fin[2]))
+  console.log('[analytics] DB_Finance row[5]:', JSON.stringify(fin[5]))
 
-  return MONTHS.map((month) => ({
-    month,
+  // Detect month columns by regex pattern in the header row
+  const finCols  = fin.length  ? detectMonthColumns(fin[0]  as unknown[]) : {}
+  const prodCols = prod.length ? detectMonthColumns(prod[0] as unknown[]) : {}
+  const expCols  = exp.length  ? detectMonthColumns(exp[0]  as unknown[]) : {}
+  const cliCols  = cli.length  ? detectMonthColumns(cli[0]  as unknown[]) : {}
 
-    // DB_Finance — row indices per spec (0-based, row 0 = header)
-    revenue:         gv(fin, 2,  month, finIdx),
-    expenses:        gv(fin, 3,  month, finIdx),
-    opExpenses:      gv(fin, 4,  month, finIdx),
-    ebitda:          gv(fin, 5,  month, finIdx),
-    ebitdaMargin:    gv(fin, 6,  month, finIdx),
-    balanceTotal:    gv(fin, 9,  month, finIdx),
-    balanceAlfa:     gv(fin, 10, month, finIdx),
-    balanceSafe:     gv(fin, 11, month, finIdx),
-    balanceYankevich:gv(fin, 12, month, finIdx),
-    balanceGorbunova:gv(fin, 13, month, finIdx),
-    balanceZhirnov:  gv(fin, 14, month, finIdx),
+  console.log('[analytics] Detected finCols:', JSON.stringify(finCols))
+  console.log('[analytics] Detected prodCols:', JSON.stringify(prodCols))
 
-    // DB_Products
-    racesRevTotal:        gv(prod, 2,  month, prodIdx),
-    racesRevMorning:      gv(prod, 3,  month, prodIdx),
-    racesRevBaseWeekday:  gv(prod, 4,  month, prodIdx),
-    racesRevRepeatWeekday:gv(prod, 5,  month, prodIdx),
-    racesRevBaseWeekend:  gv(prod, 6,  month, prodIdx),
-    racesRevRepeatWeekend:gv(prod, 7,  month, prodIdx),
-    racesRevClub:         gv(prod, 8,  month, prodIdx),
-    racesRevPromo:        gv(prod, 9,  month, prodIdx),
-    racesRevTimeAttack:   gv(prod, 10, month, prodIdx),
-    racesRevCerts:        gv(prod, 11, month, prodIdx),
-    racesCount:           gv(prod, 12, month, prodIdx),
+  // Find metric rows by label (column 0) — robust against row-index drift
+  // DB_Finance
+  const finRevenue      = findRow(fin, 'выручка', 'руб')
+  const finExpenses     = findRow(fin, 'расходы общие')
+  const finOpExpenses   = findRow(fin, 'операционные расходы')
+  const finEbitda       = findRow(fin, 'ebitda', 'руб')
+  const finEbitdaMgn    = findRow(fin, 'маржа', 'ebitda')
+  const finBalTotal     = findRow(fin, 'остаток на счетах общий')
+  const finBalAlfa      = findRow(fin, 'альфа')
+  const finBalSafe      = findRow(fin, 'сейф')
+  const finBalYankevich = findRow(fin, 'янкевич')
+  const finBalGorbunova = findRow(fin, 'горбунова')
+  const finBalZhirnov   = findRow(fin, 'жирнов')
 
-    // DB_Expenses
-    expTotal:        gv(exp, 2,  month, expIdx),
-    expOp:           gv(exp, 3,  month, expIdx),
-    expFotTotal:     gv(exp, 6,  month, expIdx),
-    expFotMarshals:  gv(exp, 7,  month, expIdx),
-    expFotAdmins:    gv(exp, 8,  month, expIdx),
-    expFotMechanics: gv(exp, 9,  month, expIdx),
-    expFotManagement:gv(exp, 10, month, expIdx),
-    expFotSales:     gv(exp, 11, month, expIdx),
-    expFotBonusTeam: gv(exp, 12, month, expIdx),
-    expFotBonusMgmt: gv(exp, 13, month, expIdx),
-    expFotMarketer:  gv(exp, 14, month, expIdx),
-    expFotTrainer:   gv(exp, 15, month, expIdx),
-    expFotAccountant:gv(exp, 16, month, expIdx),
-    expFotPhotographer:gv(exp, 17, month, expIdx),
-    expFotDesigner:  gv(exp, 18, month, expIdx),
+  console.log('[analytics] finRevenue row:', JSON.stringify(finRevenue))
+  console.log('[analytics] finEbitda row:', JSON.stringify(finEbitda))
 
-    // DB_Clients
-    clientsTotal:    gv(cli, 2,  month, cliIdx),
-    clientsNew:      gv(cli, 3,  month, cliIdx),
-    clientsNewPct:   gv(cli, 4,  month, cliIdx),
-    racesWithEvents: gv(cli, 7,  month, cliIdx),
-    trackLoad:       gv(cli, 8,  month, cliIdx),
-    incomingTraffic: gv(cli, 9,  month, cliIdx),
-    racesNoBooking:  gv(cli, 10, month, cliIdx),
-    leadsRaces:      gv(cli, 13, month, cliIdx),
-    leadsEvents:     gv(cli, 14, month, cliIdx),
-    leadsTrainings:  gv(cli, 15, month, cliIdx),
-    leadsConverted:  gv(cli, 16, month, cliIdx),
-  }))
+  // DB_Products
+  const prodRacesTotal    = findRow(prod, 'заезды сумма общая')
+  const prodMorning       = findRow(prod, 'утренние будни')
+  const prodBaseWeekday   = findRow(prod, 'базовые будни')
+  const prodRepeatWeekday = findRow(prod, 'повторные будни')
+  const prodBaseWeekend   = findRow(prod, 'базовые выходные')
+  const prodRepeatWeekend = findRow(prod, 'повторные выходные')
+  const prodClub          = findRow(prod, 'клуб')
+  const prodPromo         = findRow(prod, 'акци')
+  const prodTimeAttack    = findRow(prod, 'timeattack')
+  const prodCerts         = findRow(prod, 'сертификат')
+  const prodRacesCount    = findRow(prod, 'заезды количество')
+
+  // DB_Expenses
+  const expTotal     = findRow(exp, 'расходы общие')
+  const expOp        = findRow(exp, 'операционные расходы')
+  const expFotTotal  = findRow(exp, 'фот итого')
+  const expMarshals  = findRow(exp, 'маршал')
+  const expAdmins    = findRow(exp, 'администратор')
+  const expMechanics = findRow(exp, 'механик')
+  const expMgmt      = findRow(exp, 'управление')
+  const expSales     = findRow(exp, 'отдел продаж')
+  const expBonusTeam = findRow(exp, 'бонусы команда')
+  const expBonusMgmt = findRow(exp, 'бонусы управление')
+  const expMarketer  = findRow(exp, 'маркетолог')
+  const expTrainer   = findRow(exp, 'тренер')
+  const expAccountant= findRow(exp, 'бухгалтер')
+  const expPhoto     = findRow(exp, 'фотограф')
+  const expDesigner  = findRow(exp, 'дизайнер')
+
+  // DB_Clients
+  const cliTotal       = findRow(cli, 'кол-во клиентов всего')
+  const cliNew         = findRow(cli, 'новых клиентов')
+  const cliNewPct      = findRow(cli, 'доля новых')
+  const cliRacesEvents = findRow(cli, 'заездов всего с мероприятиями')
+  const cliTrackLoad   = findRow(cli, 'загрузка картодрома')
+  const cliIncoming    = findRow(cli, 'входящий трафик')
+  const cliNoBooking   = findRow(cli, 'без записи')
+  const cliLeadsRaces  = findRow(cli, 'заявок на заезды общее')
+  const cliLeadsEvents = findRow(cli, 'заявок на мероприятия')
+  const cliLeadsTrain  = findRow(cli, 'заявок на тренировки')
+  const cliConverted   = findRow(cli, 'записавшихся из входящего')
+
+  // The canonical month order for output — derived from what the sheet actually has
+  const ORDERED_MONTHS = ['окт.25', 'ноя.25', 'дек.25', 'янв.26', 'фев.26', 'март.26', 'апр.26', 'май.26']
+
+  // Build output — only include months that were actually detected in DB_Finance
+  const result = ORDERED_MONTHS
+    .filter((m) => m in finCols)
+    .map((month) => ({
+      month,
+      revenue:         pick(finRevenue,      month, finCols),
+      expenses:        pick(finExpenses,      month, finCols),
+      opExpenses:      pick(finOpExpenses,    month, finCols),
+      ebitda:          pick(finEbitda,        month, finCols),
+      ebitdaMargin:    pick(finEbitdaMgn,     month, finCols),
+      balanceTotal:    pick(finBalTotal,      month, finCols),
+      balanceAlfa:     pick(finBalAlfa,       month, finCols),
+      balanceSafe:     pick(finBalSafe,       month, finCols),
+      balanceYankevich:pick(finBalYankevich,  month, finCols),
+      balanceGorbunova:pick(finBalGorbunova,  month, finCols),
+      balanceZhirnov:  pick(finBalZhirnov,    month, finCols),
+
+      racesRevTotal:         pick(prodRacesTotal,    month, prodCols),
+      racesRevMorning:       pick(prodMorning,        month, prodCols),
+      racesRevBaseWeekday:   pick(prodBaseWeekday,    month, prodCols),
+      racesRevRepeatWeekday: pick(prodRepeatWeekday,  month, prodCols),
+      racesRevBaseWeekend:   pick(prodBaseWeekend,    month, prodCols),
+      racesRevRepeatWeekend: pick(prodRepeatWeekend,  month, prodCols),
+      racesRevClub:          pick(prodClub,           month, prodCols),
+      racesRevPromo:         pick(prodPromo,          month, prodCols),
+      racesRevTimeAttack:    pick(prodTimeAttack,      month, prodCols),
+      racesRevCerts:         pick(prodCerts,           month, prodCols),
+      racesCount:            pick(prodRacesCount,      month, prodCols),
+
+      expTotal:         pick(expTotal,      month, expCols),
+      expOp:            pick(expOp,         month, expCols),
+      expFotTotal:      pick(expFotTotal,   month, expCols),
+      expFotMarshals:   pick(expMarshals,   month, expCols),
+      expFotAdmins:     pick(expAdmins,     month, expCols),
+      expFotMechanics:  pick(expMechanics,  month, expCols),
+      expFotManagement: pick(expMgmt,       month, expCols),
+      expFotSales:      pick(expSales,      month, expCols),
+      expFotBonusTeam:  pick(expBonusTeam,  month, expCols),
+      expFotBonusMgmt:  pick(expBonusMgmt,  month, expCols),
+      expFotMarketer:   pick(expMarketer,   month, expCols),
+      expFotTrainer:    pick(expTrainer,    month, expCols),
+      expFotAccountant: pick(expAccountant, month, expCols),
+      expFotPhotographer:pick(expPhoto,     month, expCols),
+      expFotDesigner:   pick(expDesigner,   month, expCols),
+
+      clientsTotal:    pick(cliTotal,       month, cliCols),
+      clientsNew:      pick(cliNew,         month, cliCols),
+      clientsNewPct:   pick(cliNewPct,      month, cliCols),
+      racesWithEvents: pick(cliRacesEvents, month, cliCols),
+      trackLoad:       pick(cliTrackLoad,   month, cliCols),
+      incomingTraffic: pick(cliIncoming,    month, cliCols),
+      racesNoBooking:  pick(cliNoBooking,   month, cliCols),
+      leadsRaces:      pick(cliLeadsRaces,  month, cliCols),
+      leadsEvents:     pick(cliLeadsEvents, month, cliCols),
+      leadsTrainings:  pick(cliLeadsTrain,  month, cliCols),
+      leadsConverted:  pick(cliConverted,   month, cliCols),
+    }))
+
+  console.log('[analytics] Final data sample:', JSON.stringify(result[0]))
+  return result
 }
