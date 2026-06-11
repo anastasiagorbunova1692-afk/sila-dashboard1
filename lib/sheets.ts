@@ -90,6 +90,28 @@ async function fetchSheet(sheetName: string, range?: string): Promise<unknown[][
 // Month pattern: matches "окт.25", "ноя 25", "март.26", etc.
 const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)[.\s]\d{2}$/i
 
+const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']
+
+// gviz returns Excel serial dates (days since 1900-01-01) for date-typed cells.
+function excelDateToMonthLabel(serial: number): string {
+  // Excel incorrectly treats 1900 as a leap year, so serial 1 = Jan 1 1900.
+  // JavaScript Date counts from Unix epoch; offset by Excel base.
+  const date = new Date(1900, 0, serial - 1)
+  const month = MONTH_NAMES[date.getMonth()]
+  const year = String(date.getFullYear()).slice(2)
+  return `${month}.${year}`
+}
+
+function cellToMonthLabel(v: unknown): string | null {
+  if (v == null) return null
+  if (typeof v === 'number' && v >= 40000 && v <= 50000) {
+    return excelDateToMonthLabel(v)
+  }
+  const s = String(v).trim()
+  const norm = s.toLowerCase().replace(/\s+/g, '.').replace(/\.+/g, '.')
+  return MONTH_PATTERN.test(norm) ? norm : null
+}
+
 interface SheetParsed {
   monthColumns: Record<string, number>  // normalised label → column index
   metricRows: Record<string, unknown[]> // lower-cased label → full cell array
@@ -109,13 +131,12 @@ async function parseVerticalSheet(sheetName: string): Promise<SheetParsed | null
   const rawRows: { c: Array<{ v: unknown } | null> }[] = data.table?.rows ?? []
   if (rawRows.length === 0) return null
 
-  // rows[0] holds month names in cells
+  // rows[0] holds month identifiers in cells — either Excel serial dates or strings
   const headerCells = rawRows[0].c ?? []
   const monthColumns: Record<string, number> = {}
   headerCells.forEach((cell, idx) => {
-    const raw = cell?.v != null ? String(cell.v).trim() : ''
-    const norm = raw.toLowerCase().replace(/\s+/g, '.').replace(/\.+/g, '.')
-    if (MONTH_PATTERN.test(norm)) monthColumns[norm] = idx
+    const label = cellToMonthLabel(cell?.v)
+    if (label) monthColumns[label] = idx
   })
 
   // rows[1..N] are metric rows
