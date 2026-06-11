@@ -70,8 +70,9 @@ export interface MonthlyData {
   leadsConverted: number | null
 }
 
-async function fetchSheet(sheetName: string): Promise<unknown[][]> {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`
+async function fetchSheet(sheetName: string, range?: string): Promise<unknown[][]> {
+  const rangeParam = range ? `&range=${encodeURIComponent(range)}` : ''
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}${rangeParam}`
   const res = await fetch(url, { next: { revalidate: 300 } })
   if (!res.ok) throw new Error(`Failed to fetch sheet ${sheetName}: ${res.status}`)
   const text = await res.text()
@@ -129,7 +130,7 @@ function gv(
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 export async function fetchDashboard(): Promise<DashboardRow[]> {
-  const rows = await fetchSheet('Dashboard')
+  const rows = await fetchSheet('Dashboard', 'A1:I500')
   const result: DashboardRow[] = []
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i]

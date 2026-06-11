@@ -20,7 +20,7 @@ function filterCurrentMonth(rows: DashboardRow[]): DashboardRow[] {
       d.getFullYear() === now.getFullYear() &&
       d.getMonth() === now.getMonth() &&
       d <= now &&
-      (r.revenue !== null || r.races !== null || r.clients !== null)
+      ((r.revenue ?? 0) > 0 || (r.races ?? 0) > 0 || (r.clients ?? 0) > 0)
     )
   })
 }
