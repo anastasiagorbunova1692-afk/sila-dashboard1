@@ -123,14 +123,12 @@ export default function DailyTable({ data }: Props) {
                   </td>
                   <td className="py-2 pr-4 whitespace-nowrap" style={{ color: '#f0f0ff' }}>
                     {numCell(r.races)}
-                    {dodBadge(r.races, prev?.races)}
                   </td>
                   <td className="py-2 pr-4 whitespace-nowrap font-medium">
                     {(() => { const p = loadPct(r.races); return p === null ? <span style={{ color: '#8888aa' }}>—</span> : <span style={{ color: loadColor(p) }}>{p}%</span> })()}
                   </td>
                   <td className="py-2 pr-4 whitespace-nowrap" style={{ color: '#f0f0ff' }}>
                     {numCell(r.clients)}
-                    {dodBadge(r.clients, prev?.clients)}
                   </td>
                   <td className="py-2 pr-4" style={{ color: '#22c55e' }}>{numCell(r.newClients)}</td>
                 </tr>
