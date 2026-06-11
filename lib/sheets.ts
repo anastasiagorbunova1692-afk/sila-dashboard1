@@ -77,11 +77,56 @@ async function fetchSheet(sheetName: string): Promise<unknown[][]> {
   const text = await res.text()
   const jsonStr = text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, '')
   const data = JSON.parse(jsonStr)
-  const rows: unknown[][] = (data.table?.rows || []).map((row: { c: Array<{ v: unknown } | null> }) =>
-    (row.c || []).map((cell) => (cell ? cell.v : null))
+  const rows: unknown[][] = (data.table?.rows || []).map(
+    (row: { c: Array<{ v: unknown } | null> }) =>
+      (row.c || []).map((cell) => (cell ? cell.v : null))
   )
   return rows
 }
+
+// ── Month column detection ───────────────────────────────────────────────────
+//
+// The vertical sheets (DB_Finance etc.) have a header row where column A is
+// "Показатель" and the month columns can start at any arbitrary column.
+// This function scans the header row and returns a map of { monthName → colIndex }.
+// All subsequent value lookups use this map instead of hardcoded offsets.
+
+const MONTHS = ['окт.25', 'ноя.25', 'дек.25', 'янв.26', 'фев.26', 'март.26', 'апр.26', 'май.26']
+
+function normaliseMonthLabel(v: unknown): string {
+  if (v === null || v === undefined) return ''
+  // Sheets sometimes delivers Cyrillic month names with a trailing dot already,
+  // or with slightly different spacing — normalise to lowercase trimmed.
+  return String(v).trim().toLowerCase()
+}
+
+function buildMonthIndex(headerRow: unknown[]): Map<string, number> {
+  const idx = new Map<string, number>()
+  headerRow.forEach((cell, col) => {
+    const label = normaliseMonthLabel(cell)
+    // Match against each expected month (also normalised)
+    MONTHS.forEach((m) => {
+      if (label === m.toLowerCase()) idx.set(m, col)
+    })
+  })
+  return idx
+}
+
+// Returns value for a given month from a data row using the pre-built column map.
+function gv(
+  rows: unknown[][],
+  rowIdx: number,
+  month: string,
+  monthIdx: Map<string, number>
+): number | null {
+  const col = monthIdx.get(month)
+  if (col === undefined) return null
+  const row = rows[rowIdx]
+  if (!row) return null
+  return parseSheetsValue(row[col])
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
 
 export async function fetchDashboard(): Promise<DashboardRow[]> {
   const rows = await fetchSheet('Dashboard')
@@ -89,7 +134,7 @@ export async function fetchDashboard(): Promise<DashboardRow[]> {
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i]
     if (!r || !r[0]) continue
-    let dateVal = r[0]
+    const dateVal = r[0]
     let dateStr = ''
     if (typeof dateVal === 'string' && dateVal.startsWith('Date(')) {
       const m = dateVal.match(/Date\((\d+),(\d+),(\d+)/)
@@ -117,87 +162,84 @@ export async function fetchDashboard(): Promise<DashboardRow[]> {
   return result
 }
 
-const MONTHS = ['окт.25', 'ноя.25', 'дек.25', 'янв.26', 'фев.26', 'март.26', 'апр.26', 'май.26']
-
-function getRowValues(rows: unknown[][], rowIndex: number): (number | null)[] {
-  const row = rows[rowIndex]
-  if (!row) return MONTHS.map(() => null)
-  return MONTHS.map((_, i) => parseSheetsValue(row[i + 1]))
-}
+// ── Analytics (vertical sheets) ──────────────────────────────────────────────
 
 export async function fetchAnalytics(): Promise<MonthlyData[]> {
-  const [finRows, prodRows, expRows, clientRows] = await Promise.allSettled([
+  const [finRes, prodRes, expRes, cliRes] = await Promise.allSettled([
     fetchSheet('DB_Finance'),
     fetchSheet('DB_Products'),
     fetchSheet('DB_Expenses'),
     fetchSheet('DB_Clients'),
   ])
 
-  const fin = finRows.status === 'fulfilled' ? finRows.value : []
-  const prod = prodRows.status === 'fulfilled' ? prodRows.value : []
-  const exp = expRows.status === 'fulfilled' ? expRows.value : []
-  const cli = clientRows.status === 'fulfilled' ? clientRows.value : []
+  const fin  = finRes.status  === 'fulfilled' ? finRes.value  : []
+  const prod = prodRes.status === 'fulfilled' ? prodRes.value : []
+  const exp  = expRes.status  === 'fulfilled' ? expRes.value  : []
+  const cli  = cliRes.status  === 'fulfilled' ? cliRes.value  : []
 
-  return MONTHS.map((month, i) => {
-    const gv = (rows: unknown[][], rowIdx: number) => {
-      const row = rows[rowIdx]
-      if (!row) return null
-      return parseSheetsValue(row[i + 1])
-    }
+  // Row 0 is the header row — find month columns dynamically for each sheet.
+  const finIdx  = fin.length  ? buildMonthIndex(fin[0]  as unknown[]) : new Map<string, number>()
+  const prodIdx = prod.length ? buildMonthIndex(prod[0] as unknown[]) : new Map<string, number>()
+  const expIdx  = exp.length  ? buildMonthIndex(exp[0]  as unknown[]) : new Map<string, number>()
+  const cliIdx  = cli.length  ? buildMonthIndex(cli[0]  as unknown[]) : new Map<string, number>()
 
-    return {
-      month,
-      revenue: gv(fin, 2),
-      expenses: gv(fin, 3),
-      opExpenses: gv(fin, 4),
-      ebitda: gv(fin, 5),
-      ebitdaMargin: gv(fin, 6),
-      balanceTotal: gv(fin, 9),
-      balanceAlfa: gv(fin, 10),
-      balanceSafe: gv(fin, 11),
-      balanceYankevich: gv(fin, 12),
-      balanceGorbunova: gv(fin, 13),
-      balanceZhirnov: gv(fin, 14),
+  return MONTHS.map((month) => ({
+    month,
 
-      racesRevTotal: gv(prod, 2),
-      racesRevMorning: gv(prod, 3),
-      racesRevBaseWeekday: gv(prod, 4),
-      racesRevRepeatWeekday: gv(prod, 5),
-      racesRevBaseWeekend: gv(prod, 6),
-      racesRevRepeatWeekend: gv(prod, 7),
-      racesRevClub: gv(prod, 8),
-      racesRevPromo: gv(prod, 9),
-      racesRevTimeAttack: gv(prod, 10),
-      racesRevCerts: gv(prod, 11),
-      racesCount: gv(prod, 12),
+    // DB_Finance — row indices per spec (0-based, row 0 = header)
+    revenue:         gv(fin, 2,  month, finIdx),
+    expenses:        gv(fin, 3,  month, finIdx),
+    opExpenses:      gv(fin, 4,  month, finIdx),
+    ebitda:          gv(fin, 5,  month, finIdx),
+    ebitdaMargin:    gv(fin, 6,  month, finIdx),
+    balanceTotal:    gv(fin, 9,  month, finIdx),
+    balanceAlfa:     gv(fin, 10, month, finIdx),
+    balanceSafe:     gv(fin, 11, month, finIdx),
+    balanceYankevich:gv(fin, 12, month, finIdx),
+    balanceGorbunova:gv(fin, 13, month, finIdx),
+    balanceZhirnov:  gv(fin, 14, month, finIdx),
 
-      expTotal: gv(exp, 2),
-      expOp: gv(exp, 3),
-      expFotTotal: gv(exp, 6),
-      expFotMarshals: gv(exp, 7),
-      expFotAdmins: gv(exp, 8),
-      expFotMechanics: gv(exp, 9),
-      expFotManagement: gv(exp, 10),
-      expFotSales: gv(exp, 11),
-      expFotBonusTeam: gv(exp, 12),
-      expFotBonusMgmt: gv(exp, 13),
-      expFotMarketer: gv(exp, 14),
-      expFotTrainer: gv(exp, 15),
-      expFotAccountant: gv(exp, 16),
-      expFotPhotographer: gv(exp, 17),
-      expFotDesigner: gv(exp, 18),
+    // DB_Products
+    racesRevTotal:        gv(prod, 2,  month, prodIdx),
+    racesRevMorning:      gv(prod, 3,  month, prodIdx),
+    racesRevBaseWeekday:  gv(prod, 4,  month, prodIdx),
+    racesRevRepeatWeekday:gv(prod, 5,  month, prodIdx),
+    racesRevBaseWeekend:  gv(prod, 6,  month, prodIdx),
+    racesRevRepeatWeekend:gv(prod, 7,  month, prodIdx),
+    racesRevClub:         gv(prod, 8,  month, prodIdx),
+    racesRevPromo:        gv(prod, 9,  month, prodIdx),
+    racesRevTimeAttack:   gv(prod, 10, month, prodIdx),
+    racesRevCerts:        gv(prod, 11, month, prodIdx),
+    racesCount:           gv(prod, 12, month, prodIdx),
 
-      clientsTotal: gv(cli, 2),
-      clientsNew: gv(cli, 3),
-      clientsNewPct: gv(cli, 4),
-      racesWithEvents: gv(cli, 7),
-      trackLoad: gv(cli, 8),
-      incomingTraffic: gv(cli, 9),
-      racesNoBooking: gv(cli, 10),
-      leadsRaces: gv(cli, 13),
-      leadsEvents: gv(cli, 14),
-      leadsTrainings: gv(cli, 15),
-      leadsConverted: gv(cli, 16),
-    }
-  })
+    // DB_Expenses
+    expTotal:        gv(exp, 2,  month, expIdx),
+    expOp:           gv(exp, 3,  month, expIdx),
+    expFotTotal:     gv(exp, 6,  month, expIdx),
+    expFotMarshals:  gv(exp, 7,  month, expIdx),
+    expFotAdmins:    gv(exp, 8,  month, expIdx),
+    expFotMechanics: gv(exp, 9,  month, expIdx),
+    expFotManagement:gv(exp, 10, month, expIdx),
+    expFotSales:     gv(exp, 11, month, expIdx),
+    expFotBonusTeam: gv(exp, 12, month, expIdx),
+    expFotBonusMgmt: gv(exp, 13, month, expIdx),
+    expFotMarketer:  gv(exp, 14, month, expIdx),
+    expFotTrainer:   gv(exp, 15, month, expIdx),
+    expFotAccountant:gv(exp, 16, month, expIdx),
+    expFotPhotographer:gv(exp, 17, month, expIdx),
+    expFotDesigner:  gv(exp, 18, month, expIdx),
+
+    // DB_Clients
+    clientsTotal:    gv(cli, 2,  month, cliIdx),
+    clientsNew:      gv(cli, 3,  month, cliIdx),
+    clientsNewPct:   gv(cli, 4,  month, cliIdx),
+    racesWithEvents: gv(cli, 7,  month, cliIdx),
+    trackLoad:       gv(cli, 8,  month, cliIdx),
+    incomingTraffic: gv(cli, 9,  month, cliIdx),
+    racesNoBooking:  gv(cli, 10, month, cliIdx),
+    leadsRaces:      gv(cli, 13, month, cliIdx),
+    leadsEvents:     gv(cli, 14, month, cliIdx),
+    leadsTrainings:  gv(cli, 15, month, cliIdx),
+    leadsConverted:  gv(cli, 16, month, cliIdx),
+  }))
 }
