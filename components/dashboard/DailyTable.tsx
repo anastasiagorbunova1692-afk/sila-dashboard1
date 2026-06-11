@@ -77,6 +77,8 @@ export default function DailyTable({ data }: Props) {
           <tbody>
             {rows.map((r, i) => {
               const prev = rows[i + 1] ?? null
+              const d = new Date(r.date)
+              const isWeekend = d.getDay() === 0 || d.getDay() === 6
               const revChange = prev
                 ? ((r.revenue ?? 0) - (prev.revenue ?? 0)) / Math.abs(prev.revenue ?? 0) * 100
                 : null
@@ -86,9 +88,13 @@ export default function DailyTable({ data }: Props) {
                 <tr
                   key={r.date}
                   className="transition-colors"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: isWeekend ? 'rgba(255,255,255,0.03)' : 'transparent' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.06)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  onMouseLeave={e => {
+                    const d = new Date(r.date)
+                    const isWeekend = d.getDay() === 0 || d.getDay() === 6
+                    ;(e.currentTarget as HTMLElement).style.background = isWeekend ? 'rgba(255,255,255,0.03)' : 'transparent'
+                  }}
                 >
                   <td className="py-2 pr-4 whitespace-nowrap" style={{ color: '#8888aa' }}>
                     {formatDateWithDay(r.date)}
