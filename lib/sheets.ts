@@ -87,12 +87,16 @@ async function fetchSheet(sheetName: string, range?: string): Promise<unknown[][
 
 // ── Analytics helpers ────────────────────────────────────────────────────────
 
-const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.\d{2}$/i
+const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.?\d{2}$/i
 
-function cellToMonthLabel(v: unknown): string | null {
-  if (v == null) return null
-  const s = String(v).trim().toLowerCase()
-  return MONTH_PATTERN.test(s) ? s : null
+function cellToMonthLabel(cell: { v?: unknown; f?: unknown } | null): string | null {
+  if (!cell) return null
+  for (const raw of [cell.f, cell.v]) {
+    if (raw == null) continue
+    const s = String(raw).trim().toLowerCase()
+    if (MONTH_PATTERN.test(s)) return s
+  }
+  return null
 }
 
 interface SheetParsed {
@@ -118,7 +122,7 @@ async function parseVerticalSheet(sheetName: string): Promise<SheetParsed | null
   const headerCells = rawRows[0].c ?? []
   const monthColumns: Record<string, number> = {}
   headerCells.forEach((cell, idx) => {
-    const label = cellToMonthLabel(cell?.v)
+    const label = cellToMonthLabel(cell as { v?: unknown; f?: unknown } | null)
     if (label) monthColumns[label] = idx
   })
 

@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server'
 
 const SHEET_ID = '1bRMnBP6B4c7mctDdya9EDxYVVonebgf5vjQvLLGO3Kc'
 
-const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.\d{2}$/i
+const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.?\d{2}$/i
 
-function cellToMonthLabel(v: unknown): string | null {
-  if (v == null) return null
-  const s = String(v).trim().toLowerCase()
-  return MONTH_PATTERN.test(s) ? s : null
+function cellToMonthLabel(cell: { v?: unknown; f?: unknown } | null): string | null {
+  if (!cell) return null
+  for (const raw of [cell.f, cell.v]) {
+    if (raw == null) continue
+    const s = String(raw).trim().toLowerCase()
+    if (MONTH_PATTERN.test(s)) return s
+  }
+  return null
 }
 
 async function fetchRaw(sheetName: string, range?: string) {
@@ -24,8 +28,8 @@ export async function GET() {
   // DB_Finance — check month header detection
   const fin = await fetchRaw('DB_Finance')
   const finRows = fin?.table?.rows ?? []
-  const finHeader = (finRows[0]?.c ?? []).map((c: { v: unknown } | null, i: number) => ({
-    index: i, rawValue: c?.v ?? null, convertedLabel: cellToMonthLabel(c?.v ?? null),
+  const finHeader = (finRows[0]?.c ?? []).map((c: { v?: unknown; f?: unknown } | null, i: number) => ({
+    index: i, rawV: c?.v ?? null, rawF: c?.f ?? null, convertedLabel: cellToMonthLabel(c),
   }))
   const detectedMonths = finHeader.filter((c: { convertedLabel: string | null }) => c.convertedLabel !== null)
   const firstMetricLabels = finRows.slice(1, 6).map((r: { c: ({ v: unknown } | null)[] }) => r.c?.[0]?.v ?? '(empty)')
