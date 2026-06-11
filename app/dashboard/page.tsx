@@ -64,6 +64,9 @@ export default function DashboardPage() {
   const totalRacesCount = sum(monthData.map((r) => r.races))
   const totalClients = sum(monthData.map((r) => r.clients))
   const totalNewClients = sum(monthData.map((r) => r.newClients))
+  const newClientsPct = totalClients > 0
+    ? parseFloat((totalNewClients / totalClients * 100).toFixed(1))
+    : null
 
   const metrics = [
     {
@@ -98,6 +101,8 @@ export default function DashboardPage() {
       label: 'Клиентов / Новых',
       value: formatNum(totalClients),
       subValue: `${formatNum(totalNewClients)} новых`,
+      subValueAccent: newClientsPct !== null ? `${newClientsPct}%` : undefined,
+      progressPct: newClientsPct ?? undefined,
       spark: getLast7(monthData.map((r) => r.clients)),
       color: '#22c55e',
     },

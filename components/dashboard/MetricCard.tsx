@@ -7,10 +7,19 @@ interface MetricCardProps {
   label: string
   value: string
   subValue?: string
+  subValueAccent?: string  // displayed after subValue in accent color
+  progressPct?: number     // 0-100, renders a thin progress bar if provided
   sparkData?: number[]
 }
 
-export default function MetricCard({ label, value, subValue, sparkData = [] }: MetricCardProps) {
+export default function MetricCard({
+  label,
+  value,
+  subValue,
+  subValueAccent,
+  progressPct,
+  sparkData = [],
+}: MetricCardProps) {
   const [hovered, setHovered] = useState(false)
   const chartData = sparkData.map((v, i) => ({ i, v: v ?? 0 }))
 
@@ -36,7 +45,37 @@ export default function MetricCard({ label, value, subValue, sparkData = [] }: M
         {label}
       </p>
       <p className="text-2xl font-bold leading-tight" style={{ color: '#f0f0ff' }}>{value}</p>
-      {subValue && <p className="text-sm mt-0.5" style={{ color: '#8888aa' }}>{subValue}</p>}
+
+      {(subValue || subValueAccent) && (
+        <p className="text-sm mt-0.5">
+          {subValue && <span style={{ color: '#8888aa' }}>{subValue}</span>}
+          {subValue && subValueAccent && <span style={{ color: '#8888aa' }}> · </span>}
+          {subValueAccent && <span style={{ color: '#a855f7' }}>{subValueAccent}</span>}
+        </p>
+      )}
+
+      {progressPct !== undefined && (
+        <div
+          style={{
+            height: 4,
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.06)',
+            overflow: 'hidden',
+            marginTop: 8,
+          }}
+        >
+          <div
+            style={{
+              height: '100%',
+              width: `${Math.min(progressPct, 100)}%`,
+              borderRadius: 999,
+              background: 'linear-gradient(90deg, #7c3aed, #a855f7)',
+              transition: 'width 0.4s ease',
+            }}
+          />
+        </div>
+      )}
+
       {chartData.length > 1 && (
         <div className="mt-3 h-8">
           <ResponsiveContainer width="100%" height="100%">
