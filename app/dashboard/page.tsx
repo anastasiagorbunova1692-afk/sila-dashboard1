@@ -11,9 +11,17 @@ import { formatRubShort, formatNum } from '@/lib/formatters'
 
 function filterCurrentMonth(rows: DashboardRow[]): DashboardRow[] {
   const now = new Date()
+  now.setHours(23, 59, 59, 999)
   return rows.filter((r) => {
+    if (!r.date) return false
     const d = new Date(r.date)
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+    // same month/year, not a future date, and has at least some data
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d <= now &&
+      (r.revenue !== null || r.races !== null || r.clients !== null)
+    )
   })
 }
 

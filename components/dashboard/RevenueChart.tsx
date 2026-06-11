@@ -6,10 +6,18 @@ import {
 import type { DashboardRow } from '@/lib/sheets'
 import { formatDate, formatRub } from '@/lib/formatters'
 
+const DAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
+
+function formatDateWithDay(isoDate: string): string {
+  const d = new Date(isoDate)
+  return `${formatDate(isoDate)} ${DAYS[d.getDay()]}`
+}
+
 interface Props { data: DashboardRow[] }
 
 export default function RevenueChart({ data }: Props) {
   const chartData = data.map((r) => ({
+    isoDate: r.date,
     date: formatDate(r.date),
     revenue: r.revenue ?? 0,
     races: r.revenueRaces ?? 0,
@@ -41,6 +49,10 @@ export default function RevenueChart({ data }: Props) {
             <Tooltip
               contentStyle={{ background: '#1a1a1a', border: '1px solid #1f1f1f', borderRadius: 8 }}
               labelStyle={{ color: '#737373', fontSize: 12 }}
+              labelFormatter={(label: string, payload) => {
+                const iso = payload?.[0]?.payload?.isoDate as string | undefined
+                return iso ? formatDateWithDay(iso) : label
+              }}
               formatter={(value: number, name: string) => {
                 const labels: Record<string, string> = {
                   revenue: 'Общая',
