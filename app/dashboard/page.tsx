@@ -68,6 +68,13 @@ export default function DashboardPage() {
     ? parseFloat((totalNewClients / totalClients * 100).toFixed(1))
     : null
 
+  const TRACK_CAPACITY = 180
+  const daysWithRides = monthData.filter((r) => (r.races ?? 0) > 0)
+  const avgLoad = daysWithRides.length > 0
+    ? parseFloat((daysWithRides.reduce((s, r) => s + (r.races ?? 0) / TRACK_CAPACITY * 100, 0) / daysWithRides.length).toFixed(1))
+    : null
+  const loadColor = avgLoad === null ? '#8888aa' : avgLoad >= 70 ? '#22c55e' : avgLoad >= 40 ? '#f59e0b' : '#ef4444'
+
   const metrics = [
     {
       label: 'Выручка общая',
@@ -106,6 +113,14 @@ export default function DashboardPage() {
       spark: getLast7(monthData.map((r) => r.clients)),
       color: '#22c55e',
     },
+    {
+      label: 'Средняя загрузка',
+      value: avgLoad !== null ? `${avgLoad}%` : '—',
+      subValue: 'картодром',
+      progressPct: avgLoad ?? undefined,
+      spark: getLast7(monthData.map((r) => (r.races ?? 0) > 0 ? parseFloat(((r.races ?? 0) / TRACK_CAPACITY * 100).toFixed(1)) : null)),
+      color: loadColor,
+    },
   ]
 
   return (
@@ -141,7 +156,7 @@ export default function DashboardPage() {
 
         {loading && data.length === 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 7 }).map((_, i) => (
               <div key={i} className="animate-pulse h-28 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} />
             ))}
           </div>

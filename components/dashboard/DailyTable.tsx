@@ -29,8 +29,16 @@ export default function DailyTable({ data }: Props) {
     .filter((r) => Boolean(r.date))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-  // Build a lookup by date for previous-day access (rows are desc, so prev = rows[i+1])
-  const headers = ['Дата', 'Выручка общая', 'vs вчера', 'Заезды ₽', 'Заездов', 'Клиентов', 'Новых']
+  const TRACK_CAPACITY = 180
+  function loadPct(races: number | null | undefined): number | null {
+    if (races == null || races === 0) return null
+    return parseFloat((races / TRACK_CAPACITY * 100).toFixed(1))
+  }
+  function loadColor(pct: number): string {
+    return pct >= 70 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444'
+  }
+
+  const headers = ['Дата', 'Выручка общая', 'vs вчера', 'Заезды ₽', 'Заездов', 'Загрузка', 'Клиентов', 'Новых']
 
   return (
     <div
@@ -117,6 +125,9 @@ export default function DailyTable({ data }: Props) {
                     {numCell(r.races)}
                     {dodBadge(r.races, prev?.races)}
                   </td>
+                  <td className="py-2 pr-4 whitespace-nowrap font-medium">
+                    {(() => { const p = loadPct(r.races); return p === null ? <span style={{ color: '#8888aa' }}>—</span> : <span style={{ color: loadColor(p) }}>{p}%</span> })()}
+                  </td>
                   <td className="py-2 pr-4 whitespace-nowrap" style={{ color: '#f0f0ff' }}>
                     {numCell(r.clients)}
                     {dodBadge(r.clients, prev?.clients)}
@@ -127,7 +138,7 @@ export default function DailyTable({ data }: Props) {
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-8 text-center" style={{ color: '#8888aa' }}>
+                <td colSpan={8} className="py-8 text-center" style={{ color: '#8888aa' }}>
                   Нет данных
                 </td>
               </tr>

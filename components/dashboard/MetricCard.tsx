@@ -10,6 +10,8 @@ interface MetricCardProps {
   subValueAccent?: string  // displayed after subValue in accent color
   progressPct?: number     // 0-100, renders a thin progress bar if provided
   sparkData?: number[]
+  color?: string           // override value text color
+  spark?: number[]         // alias accepted from page (mapped to sparkData)
 }
 
 export default function MetricCard({
@@ -18,10 +20,13 @@ export default function MetricCard({
   subValue,
   subValueAccent,
   progressPct,
-  sparkData = [],
+  sparkData,
+  color,
+  spark,
 }: MetricCardProps) {
+  const data = sparkData ?? spark ?? []
   const [hovered, setHovered] = useState(false)
-  const chartData = sparkData.map((v, i) => ({ i, v: v ?? 0 }))
+  const chartData = data.map((v, i) => ({ i, v: v ?? 0 }))
 
   return (
     <div
@@ -44,7 +49,7 @@ export default function MetricCard({
       >
         {label}
       </p>
-      <p className="text-2xl font-bold leading-tight" style={{ color: '#f0f0ff' }}>{value}</p>
+      <p className="text-2xl font-bold leading-tight" style={{ color: color ?? '#f0f0ff' }}>{value}</p>
 
       {(subValue || subValueAccent) && (
         <p className="text-sm mt-0.5">
