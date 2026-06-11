@@ -7,6 +7,7 @@ import MetricCard from '@/components/dashboard/MetricCard'
 import RevenueChart from '@/components/dashboard/RevenueChart'
 import DailyTable from '@/components/dashboard/DailyTable'
 import MtdBlock from '@/components/dashboard/MtdBlock'
+import RevenueBreakdown from '@/components/dashboard/RevenueBreakdown'
 import { fetchDashboard, type DashboardRow } from '@/lib/sheets'
 import { formatRubShort, formatNum } from '@/lib/formatters'
 
@@ -140,11 +141,18 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {metrics.map((m) => (
-              <MetricCard key={m.label} {...m} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+              {metrics.map((m) => (
+                <MetricCard key={m.label} {...m} />
+              ))}
+            </div>
+            {monthData.length > 0 && (
+              <div className="mb-6">
+                <RevenueBreakdown data={monthData} />
+              </div>
+            )}
+          </>
         )}
 
         {monthData.length > 0 && (
