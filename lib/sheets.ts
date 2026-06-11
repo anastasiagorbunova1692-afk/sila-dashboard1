@@ -87,34 +87,58 @@ async function fetchSheet(sheetName: string, range?: string): Promise<unknown[][
 
 // ── Analytics helpers ────────────────────────────────────────────────────────
 
-// Month pattern: matches "окт.25", "ноя.25", "март.26", etc.
-const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.?\s*\d{2}$/i
+// Month pattern: matches "окт.25", "ноя 25", "март.26", etc.
+const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)[.\s]\d{2}$/i
 
-// Scan header row and return { 'окт.25': 9, 'ноя.25': 10, ... }
-// Normalises cell values so "Окт.25", "окт.25", "окт 25" all match.
-function detectMonthColumns(headerRow: unknown[]): Record<string, number> {
-  const cols: Record<string, number> = {}
-  headerRow.forEach((cell, idx) => {
-    const raw = cell === null || cell === undefined ? '' : String(cell).trim()
-    // Normalise: lowercase, collapse spaces, ensure single dot before year
-    const norm = raw.toLowerCase().replace(/\s+/g, '.').replace(/\.+/g, '.')
-    if (MONTH_PATTERN.test(norm)) {
-      cols[norm] = idx
-    }
-  })
-  return cols
+interface SheetParsed {
+  monthColumns: Record<string, number>  // normalised label → column index
+  metricRows: Record<string, unknown[]> // lower-cased label → full cell array
+  months: string[]                      // ordered list of detected month keys
 }
 
-// Find the row whose column-0 label contains all of the given keywords (case-insensitive).
-function findRow(rows: unknown[][], ...keywords: string[]): unknown[] | null {
-  for (const row of rows) {
-    const label = row[0] === null || row[0] === undefined ? '' : String(row[0]).toLowerCase()
+// Parse a "vertical" analytics sheet where:
+//   rows[0] = header row containing month names in data cells (not in table.cols)
+//   rows[1..N] = metric rows, column 0 = metric label
+async function parseVerticalSheet(sheetName: string): Promise<SheetParsed | null> {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`
+  const res = await fetch(url, { next: { revalidate: 300 } })
+  if (!res.ok) return null
+  const text = await res.text()
+  const jsonStr = text.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, '')
+  const data = JSON.parse(jsonStr)
+  const rawRows: { c: Array<{ v: unknown } | null> }[] = data.table?.rows ?? []
+  if (rawRows.length === 0) return null
+
+  // rows[0] holds month names in cells
+  const headerCells = rawRows[0].c ?? []
+  const monthColumns: Record<string, number> = {}
+  headerCells.forEach((cell, idx) => {
+    const raw = cell?.v != null ? String(cell.v).trim() : ''
+    const norm = raw.toLowerCase().replace(/\s+/g, '.').replace(/\.+/g, '.')
+    if (MONTH_PATTERN.test(norm)) monthColumns[norm] = idx
+  })
+
+  // rows[1..N] are metric rows
+  const metricRows: Record<string, unknown[]> = {}
+  for (let i = 1; i < rawRows.length; i++) {
+    const cells = rawRows[i].c ?? []
+    const vals = cells.map((c) => (c ? c.v : null))
+    const label = vals[0] != null ? String(vals[0]).trim().toLowerCase() : ''
+    if (label) metricRows[label] = vals
+  }
+
+  return { monthColumns, metricRows, months: Object.keys(monthColumns) }
+}
+
+// Find a metric row whose label includes all given keywords (case-insensitive).
+function findMetric(metricRows: Record<string, unknown[]>, ...keywords: string[]): unknown[] | null {
+  for (const [label, row] of Object.entries(metricRows)) {
     if (keywords.every((kw) => label.includes(kw.toLowerCase()))) return row
   }
   return null
 }
 
-// Extract a value from `row` at the column for `month`.
+// Extract a numeric value at the month column.
 function pick(row: unknown[] | null, month: string, cols: Record<string, number>): number | null {
   if (!row) return null
   const col = cols[month]
@@ -166,153 +190,140 @@ export async function fetchDashboard(): Promise<DashboardRow[]> {
 
 export async function fetchAnalytics(): Promise<MonthlyData[]> {
   const [finRes, prodRes, expRes, cliRes] = await Promise.allSettled([
-    fetchSheet('DB_Finance'),
-    fetchSheet('DB_Products'),
-    fetchSheet('DB_Expenses'),
-    fetchSheet('DB_Clients'),
+    parseVerticalSheet('DB_Finance'),
+    parseVerticalSheet('DB_Products'),
+    parseVerticalSheet('DB_Expenses'),
+    parseVerticalSheet('DB_Clients'),
   ])
 
-  const fin  = finRes.status  === 'fulfilled' ? finRes.value  : []
-  const prod = prodRes.status === 'fulfilled' ? prodRes.value : []
-  const exp  = expRes.status  === 'fulfilled' ? expRes.value  : []
-  const cli  = cliRes.status  === 'fulfilled' ? cliRes.value  : []
+  const fin  = finRes.status  === 'fulfilled' ? finRes.value  : null
+  const prod = prodRes.status === 'fulfilled' ? prodRes.value : null
+  const exp  = expRes.status  === 'fulfilled' ? expRes.value  : null
+  const cli  = cliRes.status  === 'fulfilled' ? cliRes.value  : null
 
-  // ── Debug logs (visible in browser console) ──
-  console.log('[analytics] DB_Finance rows:', fin.length)
-  console.log('[analytics] DB_Finance header:', JSON.stringify(fin[0]))
-  console.log('[analytics] DB_Finance row[2]:', JSON.stringify(fin[2]))
-  console.log('[analytics] DB_Finance row[5]:', JSON.stringify(fin[5]))
+  if (!fin) return []
 
-  // Detect month columns by regex pattern in the header row
-  const finCols  = fin.length  ? detectMonthColumns(fin[0]  as unknown[]) : {}
-  const prodCols = prod.length ? detectMonthColumns(prod[0] as unknown[]) : {}
-  const expCols  = exp.length  ? detectMonthColumns(exp[0]  as unknown[]) : {}
-  const cliCols  = cli.length  ? detectMonthColumns(cli[0]  as unknown[]) : {}
+  const finCols  = fin.monthColumns
+  const prodCols = prod?.monthColumns ?? {}
+  const expCols  = exp?.monthColumns  ?? {}
+  const cliCols  = cli?.monthColumns  ?? {}
 
-  console.log('[analytics] Detected finCols:', JSON.stringify(finCols))
-  console.log('[analytics] Detected prodCols:', JSON.stringify(prodCols))
+  const finRows  = fin.metricRows
+  const prodRows = prod?.metricRows ?? {}
+  const expRows  = exp?.metricRows  ?? {}
+  const cliRows  = cli?.metricRows  ?? {}
 
-  // Find metric rows by label (column 0) — robust against row-index drift
   // DB_Finance
-  const finRevenue      = findRow(fin, 'выручка', 'руб')
-  const finExpenses     = findRow(fin, 'расходы общие')
-  const finOpExpenses   = findRow(fin, 'операционные расходы')
-  const finEbitda       = findRow(fin, 'ebitda', 'руб')
-  const finEbitdaMgn    = findRow(fin, 'маржа', 'ebitda')
-  const finBalTotal     = findRow(fin, 'остаток на счетах общий')
-  const finBalAlfa      = findRow(fin, 'альфа')
-  const finBalSafe      = findRow(fin, 'сейф')
-  const finBalYankevich = findRow(fin, 'янкевич')
-  const finBalGorbunova = findRow(fin, 'горбунова')
-  const finBalZhirnov   = findRow(fin, 'жирнов')
-
-  console.log('[analytics] finRevenue row:', JSON.stringify(finRevenue))
-  console.log('[analytics] finEbitda row:', JSON.stringify(finEbitda))
+  const finRevenue      = findMetric(finRows, 'выручка', 'руб')
+  const finExpenses     = findMetric(finRows, 'расходы общие')
+  const finOpExpenses   = findMetric(finRows, 'операционные расходы')
+  const finEbitda       = findMetric(finRows, 'ebitda', 'руб')
+  const finEbitdaMgn    = findMetric(finRows, 'маржа', 'ebitda')
+  const finBalTotal     = findMetric(finRows, 'остаток на счетах общий')
+  const finBalAlfa      = findMetric(finRows, 'альфа')
+  const finBalSafe      = findMetric(finRows, 'сейф')
+  const finBalYankevich = findMetric(finRows, 'янкевич')
+  const finBalGorbunova = findMetric(finRows, 'горбунова')
+  const finBalZhirnov   = findMetric(finRows, 'жирнов')
 
   // DB_Products
-  const prodRacesTotal    = findRow(prod, 'заезды сумма общая')
-  const prodMorning       = findRow(prod, 'утренние будни')
-  const prodBaseWeekday   = findRow(prod, 'базовые будни')
-  const prodRepeatWeekday = findRow(prod, 'повторные будни')
-  const prodBaseWeekend   = findRow(prod, 'базовые выходные')
-  const prodRepeatWeekend = findRow(prod, 'повторные выходные')
-  const prodClub          = findRow(prod, 'клуб')
-  const prodPromo         = findRow(prod, 'акци')
-  const prodTimeAttack    = findRow(prod, 'timeattack')
-  const prodCerts         = findRow(prod, 'сертификат')
-  const prodRacesCount    = findRow(prod, 'заезды количество')
+  const prodRacesTotal    = findMetric(prodRows, 'заезды сумма общая')
+  const prodMorning       = findMetric(prodRows, 'утренние будни')
+  const prodBaseWeekday   = findMetric(prodRows, 'базовые будни')
+  const prodRepeatWeekday = findMetric(prodRows, 'повторные будни')
+  const prodBaseWeekend   = findMetric(prodRows, 'базовые выходные')
+  const prodRepeatWeekend = findMetric(prodRows, 'повторные выходные')
+  const prodClub          = findMetric(prodRows, 'клуб')
+  const prodPromo         = findMetric(prodRows, 'акци')
+  const prodTimeAttack    = findMetric(prodRows, 'timeattack')
+  const prodCerts         = findMetric(prodRows, 'сертификат')
+  const prodRacesCount    = findMetric(prodRows, 'заезды количество')
 
   // DB_Expenses
-  const expTotal     = findRow(exp, 'расходы общие')
-  const expOp        = findRow(exp, 'операционные расходы')
-  const expFotTotal  = findRow(exp, 'фот итого')
-  const expMarshals  = findRow(exp, 'маршал')
-  const expAdmins    = findRow(exp, 'администратор')
-  const expMechanics = findRow(exp, 'механик')
-  const expMgmt      = findRow(exp, 'управление')
-  const expSales     = findRow(exp, 'отдел продаж')
-  const expBonusTeam = findRow(exp, 'бонусы команда')
-  const expBonusMgmt = findRow(exp, 'бонусы управление')
-  const expMarketer  = findRow(exp, 'маркетолог')
-  const expTrainer   = findRow(exp, 'тренер')
-  const expAccountant= findRow(exp, 'бухгалтер')
-  const expPhoto     = findRow(exp, 'фотограф')
-  const expDesigner  = findRow(exp, 'дизайнер')
+  const expTotal      = findMetric(expRows, 'расходы общие')
+  const expOp         = findMetric(expRows, 'операционные расходы')
+  const expFotTotal   = findMetric(expRows, 'фот итого')
+  const expMarshals   = findMetric(expRows, 'маршал')
+  const expAdmins     = findMetric(expRows, 'администратор')
+  const expMechanics  = findMetric(expRows, 'механик')
+  const expMgmt       = findMetric(expRows, 'управление')
+  const expSales      = findMetric(expRows, 'отдел продаж')
+  const expBonusTeam  = findMetric(expRows, 'бонусы команда')
+  const expBonusMgmt  = findMetric(expRows, 'бонусы управление')
+  const expMarketer   = findMetric(expRows, 'маркетолог')
+  const expTrainer    = findMetric(expRows, 'тренер')
+  const expAccountant = findMetric(expRows, 'бухгалтер')
+  const expPhoto      = findMetric(expRows, 'фотограф')
+  const expDesigner   = findMetric(expRows, 'дизайнер')
 
   // DB_Clients
-  const cliTotal       = findRow(cli, 'кол-во клиентов всего')
-  const cliNew         = findRow(cli, 'новых клиентов')
-  const cliNewPct      = findRow(cli, 'доля новых')
-  const cliRacesEvents = findRow(cli, 'заездов всего с мероприятиями')
-  const cliTrackLoad   = findRow(cli, 'загрузка картодрома')
-  const cliIncoming    = findRow(cli, 'входящий трафик')
-  const cliNoBooking   = findRow(cli, 'без записи')
-  const cliLeadsRaces  = findRow(cli, 'заявок на заезды общее')
-  const cliLeadsEvents = findRow(cli, 'заявок на мероприятия')
-  const cliLeadsTrain  = findRow(cli, 'заявок на тренировки')
-  const cliConverted   = findRow(cli, 'записавшихся из входящего')
+  const cliTotal       = findMetric(cliRows, 'кол-во клиентов всего')
+  const cliNew         = findMetric(cliRows, 'новых клиентов')
+  const cliNewPct      = findMetric(cliRows, 'доля новых')
+  const cliRacesEvents = findMetric(cliRows, 'заездов всего с мероприятиями')
+  const cliTrackLoad   = findMetric(cliRows, 'загрузка картодрома')
+  const cliIncoming    = findMetric(cliRows, 'входящий трафик')
+  const cliNoBooking   = findMetric(cliRows, 'без записи')
+  const cliLeadsRaces  = findMetric(cliRows, 'заявок на заезды общее')
+  const cliLeadsEvents = findMetric(cliRows, 'заявок на мероприятия')
+  const cliLeadsTrain  = findMetric(cliRows, 'заявок на тренировки')
+  const cliConverted   = findMetric(cliRows, 'записавшихся из входящего')
 
-  // The canonical month order for output — derived from what the sheet actually has
-  const ORDERED_MONTHS = ['окт.25', 'ноя.25', 'дек.25', 'янв.26', 'фев.26', 'март.26', 'апр.26', 'май.26']
+  // Use months detected from DB_Finance, sorted chronologically
+  const months = fin.months.sort()
 
-  // Build output — only include months that were actually detected in DB_Finance
-  const result = ORDERED_MONTHS
-    .filter((m) => m in finCols)
-    .map((month) => ({
-      month,
-      revenue:         pick(finRevenue,      month, finCols),
-      expenses:        pick(finExpenses,      month, finCols),
-      opExpenses:      pick(finOpExpenses,    month, finCols),
-      ebitda:          pick(finEbitda,        month, finCols),
-      ebitdaMargin:    pick(finEbitdaMgn,     month, finCols),
-      balanceTotal:    pick(finBalTotal,      month, finCols),
-      balanceAlfa:     pick(finBalAlfa,       month, finCols),
-      balanceSafe:     pick(finBalSafe,       month, finCols),
-      balanceYankevich:pick(finBalYankevich,  month, finCols),
-      balanceGorbunova:pick(finBalGorbunova,  month, finCols),
-      balanceZhirnov:  pick(finBalZhirnov,    month, finCols),
+  return months.map((month) => ({
+    month,
+    revenue:         pick(finRevenue,      month, finCols),
+    expenses:        pick(finExpenses,      month, finCols),
+    opExpenses:      pick(finOpExpenses,    month, finCols),
+    ebitda:          pick(finEbitda,        month, finCols),
+    ebitdaMargin:    pick(finEbitdaMgn,     month, finCols),
+    balanceTotal:    pick(finBalTotal,      month, finCols),
+    balanceAlfa:     pick(finBalAlfa,       month, finCols),
+    balanceSafe:     pick(finBalSafe,       month, finCols),
+    balanceYankevich:pick(finBalYankevich,  month, finCols),
+    balanceGorbunova:pick(finBalGorbunova,  month, finCols),
+    balanceZhirnov:  pick(finBalZhirnov,    month, finCols),
 
-      racesRevTotal:         pick(prodRacesTotal,    month, prodCols),
-      racesRevMorning:       pick(prodMorning,        month, prodCols),
-      racesRevBaseWeekday:   pick(prodBaseWeekday,    month, prodCols),
-      racesRevRepeatWeekday: pick(prodRepeatWeekday,  month, prodCols),
-      racesRevBaseWeekend:   pick(prodBaseWeekend,    month, prodCols),
-      racesRevRepeatWeekend: pick(prodRepeatWeekend,  month, prodCols),
-      racesRevClub:          pick(prodClub,           month, prodCols),
-      racesRevPromo:         pick(prodPromo,          month, prodCols),
-      racesRevTimeAttack:    pick(prodTimeAttack,      month, prodCols),
-      racesRevCerts:         pick(prodCerts,           month, prodCols),
-      racesCount:            pick(prodRacesCount,      month, prodCols),
+    racesRevTotal:         pick(prodRacesTotal,    month, prodCols),
+    racesRevMorning:       pick(prodMorning,        month, prodCols),
+    racesRevBaseWeekday:   pick(prodBaseWeekday,    month, prodCols),
+    racesRevRepeatWeekday: pick(prodRepeatWeekday,  month, prodCols),
+    racesRevBaseWeekend:   pick(prodBaseWeekend,    month, prodCols),
+    racesRevRepeatWeekend: pick(prodRepeatWeekend,  month, prodCols),
+    racesRevClub:          pick(prodClub,           month, prodCols),
+    racesRevPromo:         pick(prodPromo,          month, prodCols),
+    racesRevTimeAttack:    pick(prodTimeAttack,      month, prodCols),
+    racesRevCerts:         pick(prodCerts,           month, prodCols),
+    racesCount:            pick(prodRacesCount,      month, prodCols),
 
-      expTotal:         pick(expTotal,      month, expCols),
-      expOp:            pick(expOp,         month, expCols),
-      expFotTotal:      pick(expFotTotal,   month, expCols),
-      expFotMarshals:   pick(expMarshals,   month, expCols),
-      expFotAdmins:     pick(expAdmins,     month, expCols),
-      expFotMechanics:  pick(expMechanics,  month, expCols),
-      expFotManagement: pick(expMgmt,       month, expCols),
-      expFotSales:      pick(expSales,      month, expCols),
-      expFotBonusTeam:  pick(expBonusTeam,  month, expCols),
-      expFotBonusMgmt:  pick(expBonusMgmt,  month, expCols),
-      expFotMarketer:   pick(expMarketer,   month, expCols),
-      expFotTrainer:    pick(expTrainer,    month, expCols),
-      expFotAccountant: pick(expAccountant, month, expCols),
-      expFotPhotographer:pick(expPhoto,     month, expCols),
-      expFotDesigner:   pick(expDesigner,   month, expCols),
+    expTotal:         pick(expTotal,      month, expCols),
+    expOp:            pick(expOp,         month, expCols),
+    expFotTotal:      pick(expFotTotal,   month, expCols),
+    expFotMarshals:   pick(expMarshals,   month, expCols),
+    expFotAdmins:     pick(expAdmins,     month, expCols),
+    expFotMechanics:  pick(expMechanics,  month, expCols),
+    expFotManagement: pick(expMgmt,       month, expCols),
+    expFotSales:      pick(expSales,      month, expCols),
+    expFotBonusTeam:  pick(expBonusTeam,  month, expCols),
+    expFotBonusMgmt:  pick(expBonusMgmt,  month, expCols),
+    expFotMarketer:   pick(expMarketer,   month, expCols),
+    expFotTrainer:    pick(expTrainer,    month, expCols),
+    expFotAccountant: pick(expAccountant, month, expCols),
+    expFotPhotographer:pick(expPhoto,     month, expCols),
+    expFotDesigner:   pick(expDesigner,   month, expCols),
 
-      clientsTotal:    pick(cliTotal,       month, cliCols),
-      clientsNew:      pick(cliNew,         month, cliCols),
-      clientsNewPct:   pick(cliNewPct,      month, cliCols),
-      racesWithEvents: pick(cliRacesEvents, month, cliCols),
-      trackLoad:       pick(cliTrackLoad,   month, cliCols),
-      incomingTraffic: pick(cliIncoming,    month, cliCols),
-      racesNoBooking:  pick(cliNoBooking,   month, cliCols),
-      leadsRaces:      pick(cliLeadsRaces,  month, cliCols),
-      leadsEvents:     pick(cliLeadsEvents, month, cliCols),
-      leadsTrainings:  pick(cliLeadsTrain,  month, cliCols),
-      leadsConverted:  pick(cliConverted,   month, cliCols),
-    }))
-
-  console.log('[analytics] Final data sample:', JSON.stringify(result[0]))
-  return result
+    clientsTotal:    pick(cliTotal,       month, cliCols),
+    clientsNew:      pick(cliNew,         month, cliCols),
+    clientsNewPct:   pick(cliNewPct,      month, cliCols),
+    racesWithEvents: pick(cliRacesEvents, month, cliCols),
+    trackLoad:       pick(cliTrackLoad,   month, cliCols),
+    incomingTraffic: pick(cliIncoming,    month, cliCols),
+    racesNoBooking:  pick(cliNoBooking,   month, cliCols),
+    leadsRaces:      pick(cliLeadsRaces,  month, cliCols),
+    leadsEvents:     pick(cliLeadsEvents, month, cliCols),
+    leadsTrainings:  pick(cliLeadsTrain,  month, cliCols),
+    leadsConverted:  pick(cliConverted,   month, cliCols),
+  }))
 }
