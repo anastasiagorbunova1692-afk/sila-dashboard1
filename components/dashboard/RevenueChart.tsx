@@ -4,14 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 import type { DashboardRow } from '@/lib/sheets'
-import { formatDate, formatRub } from '@/lib/formatters'
-
-const DAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
-
-function formatDateWithDay(isoDate: string): string {
-  const d = new Date(isoDate)
-  return `${formatDate(isoDate)} ${DAYS[d.getDay()]}`
-}
+import { formatDate, formatDateWithDay, formatRub } from '@/lib/formatters'
 
 interface Props { data: DashboardRow[] }
 
