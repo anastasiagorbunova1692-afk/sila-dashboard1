@@ -2,19 +2,12 @@ import { NextResponse } from 'next/server'
 
 const SHEET_ID = '1bRMnBP6B4c7mctDdya9EDxYVVonebgf5vjQvLLGO3Kc'
 
-const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']
-const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)[.\s]\d{2}$/i
+const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.\d{2}$/i
 
-function excelDateToMonthLabel(serial: number): string {
-  const date = new Date(1900, 0, serial - 1)
-  return `${MONTH_NAMES[date.getMonth()]}.${String(date.getFullYear()).slice(2)}`
-}
 function cellToMonthLabel(v: unknown): string | null {
   if (v == null) return null
-  if (typeof v === 'number' && v >= 40000 && v <= 50000) return excelDateToMonthLabel(v)
-  const s = String(v).trim()
-  const norm = s.toLowerCase().replace(/\s+/g, '.').replace(/\.+/g, '.')
-  return MONTH_PATTERN.test(norm) ? norm : null
+  const s = String(v).trim().toLowerCase()
+  return MONTH_PATTERN.test(s) ? s : null
 }
 
 async function fetchRaw(sheetName: string, range?: string) {

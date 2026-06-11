@@ -87,29 +87,12 @@ async function fetchSheet(sheetName: string, range?: string): Promise<unknown[][
 
 // ── Analytics helpers ────────────────────────────────────────────────────────
 
-// Month pattern: matches "окт.25", "ноя 25", "март.26", etc.
-const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)[.\s]\d{2}$/i
-
-const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']
-
-// gviz returns Excel serial dates (days since 1900-01-01) for date-typed cells.
-function excelDateToMonthLabel(serial: number): string {
-  // Excel incorrectly treats 1900 as a leap year, so serial 1 = Jan 1 1900.
-  // JavaScript Date counts from Unix epoch; offset by Excel base.
-  const date = new Date(1900, 0, serial - 1)
-  const month = MONTH_NAMES[date.getMonth()]
-  const year = String(date.getFullYear()).slice(2)
-  return `${month}.${year}`
-}
+const MONTH_PATTERN = /^(янв|фев|мар|апр|май|июн|июл|авг|сен|окт|ноя|дек)\.\d{2}$/i
 
 function cellToMonthLabel(v: unknown): string | null {
   if (v == null) return null
-  if (typeof v === 'number' && v >= 40000 && v <= 50000) {
-    return excelDateToMonthLabel(v)
-  }
-  const s = String(v).trim()
-  const norm = s.toLowerCase().replace(/\s+/g, '.').replace(/\.+/g, '.')
-  return MONTH_PATTERN.test(norm) ? norm : null
+  const s = String(v).trim().toLowerCase()
+  return MONTH_PATTERN.test(s) ? s : null
 }
 
 interface SheetParsed {
