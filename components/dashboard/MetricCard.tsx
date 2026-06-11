@@ -39,7 +39,7 @@ export default function MetricCard({
         border: hovered ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.08)',
         borderRadius: 16,
         boxShadow: hovered ? '0 4px 32px rgba(124,58,237,0.15)' : '0 4px 24px rgba(0,0,0,0.4)',
-        padding: 20,
+        padding: '12px 16px',
         transition: 'all 0.3s ease',
       }}
     >
@@ -49,7 +49,7 @@ export default function MetricCard({
       >
         {label}
       </p>
-      <p className="text-2xl font-bold leading-tight" style={{ color: color ?? '#f0f0ff' }}>{value}</p>
+      <p className="text-xl font-bold leading-tight" style={{ color: color ?? '#f0f0ff' }}>{value}</p>
 
       {(subValue || subValueAccent) && (
         <p className="text-sm mt-0.5">
@@ -82,7 +82,7 @@ export default function MetricCard({
       )}
 
       {chartData.length > 1 && (
-        <div className="mt-3 h-8">
+        <div className="mt-2 h-6">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
               <defs>

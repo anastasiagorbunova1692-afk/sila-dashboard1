@@ -155,20 +155,20 @@ export default function DashboardPage() {
         )}
 
         {loading && data.length === 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="animate-pulse h-28 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} />
+              <div key={i} className="animate-pulse h-24 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} />
             ))}
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
               {metrics.map((m) => (
                 <MetricCard key={m.label} {...m} />
               ))}
             </div>
             {monthData.length > 0 && (
-              <div className="mb-6">
+              <div className="mb-4">
                 <RevenueBreakdown data={monthData} />
               </div>
             )}
@@ -177,7 +177,7 @@ export default function DashboardPage() {
 
         {monthData.length > 0 && (
           <>
-            <div className="mb-6">
+            <div className="mb-4">
               <RevenueChart data={monthData} />
             </div>
             {data.length > 0 && <MtdBlock allData={data} />}
