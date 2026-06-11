@@ -17,33 +17,47 @@ export default function Sidebar() {
     <>
       {/* Mobile hamburger */}
       <button
-        className="fixed top-4 left-4 z-50 md:hidden flex flex-col gap-1.5 p-2 rounded-lg bg-[#141414] border border-[#1f1f1f]"
+        className="fixed top-4 left-4 z-50 md:hidden flex flex-col gap-1.5 p-2 rounded-xl"
+        style={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label="Меню"
       >
-        <span className={`block w-5 h-0.5 bg-[#f5f5f5] transition-all ${mobileOpen ? 'rotate-45 translate-y-2' : ''}`} />
-        <span className={`block w-5 h-0.5 bg-[#f5f5f5] transition-all ${mobileOpen ? 'opacity-0' : ''}`} />
-        <span className={`block w-5 h-0.5 bg-[#f5f5f5] transition-all ${mobileOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+        <span className={`block w-5 h-0.5 bg-[#f0f0ff] transition-all ${mobileOpen ? 'rotate-45 translate-y-2' : ''}`} />
+        <span className={`block w-5 h-0.5 bg-[#f0f0ff] transition-all ${mobileOpen ? 'opacity-0' : ''}`} />
+        <span className={`block w-5 h-0.5 bg-[#f0f0ff] transition-all ${mobileOpen ? '-rotate-45 -translate-y-2' : ''}`} />
       </button>
 
       {/* Overlay */}
       {mobileOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/60 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
+        <div className="fixed inset-0 z-30 bg-black/70 md:hidden" onClick={() => setMobileOpen(false)} />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full z-40 w-[220px] bg-[#0d0d0d] border-r border-[#1f1f1f] flex flex-col transition-transform duration-300
+        className={`fixed top-0 left-0 h-full z-40 w-[220px] flex flex-col transition-transform duration-300
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+        style={{
+          background: 'rgba(8,8,16,0.95)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+        }}
       >
         {/* Logo */}
-        <div className="px-6 py-6 border-b border-[#1f1f1f]">
+        <div className="px-6 py-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-2">
-            <span className="text-[#22c55e] text-2xl font-black tracking-tight">SILA</span>
-            <span className="text-[#737373] text-xs mt-1">картинг</span>
+            <span
+              className="text-2xl font-black tracking-tight"
+              style={{
+                background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              SILA
+            </span>
+            <span className="text-[#8888aa] text-xs mt-1">картинг</span>
           </div>
         </div>
 
@@ -56,15 +70,18 @@ export default function Sidebar() {
                 key={href}
                 href={href}
                 onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative
-                  ${active
-                    ? 'text-[#22c55e] bg-[#22c55e]/10'
-                    : 'text-[#737373] hover:text-[#f5f5f5] hover:bg-[#1a1a1a]'
-                  }`}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative"
+                style={active ? {
+                  background: 'rgba(124,58,237,0.15)',
+                  color: '#a855f7',
+                  borderLeft: '2px solid #7c3aed',
+                  paddingLeft: 10,
+                } : {
+                  color: '#8888aa',
+                }}
+                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.1)'; (e.currentTarget as HTMLElement).style.color = '#f0f0ff' }}
+                onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#8888aa' } }}
               >
-                {active && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-[#22c55e] rounded-r" />
-                )}
                 <span>{icon}</span>
                 <span>{label}</span>
               </Link>
@@ -72,8 +89,8 @@ export default function Sidebar() {
           })}
         </nav>
 
-        <div className="px-6 py-4 border-t border-[#1f1f1f]">
-          <p className="text-[#737373] text-xs">v1.0</p>
+        <div className="px-6 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-[#8888aa] text-xs">v1.0</p>
         </div>
       </aside>
     </>

@@ -27,13 +27,32 @@ export default function Accordion({ title, defaultOpen = false, children, previe
   }, [open])
 
   return (
-    <div className="bg-[#141414] border border-[#1f1f1f] rounded-xl overflow-hidden">
+    <div
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 16,
+        boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+        overflow: 'hidden',
+        transition: 'all 0.3s ease',
+      }}
+    >
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[#1a1a1a] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 text-left transition-all duration-300"
+        style={{ background: 'rgba(255,255,255,0.03)' }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.08)'}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
       >
-        <span className="text-[#f5f5f5] font-semibold">{title}</span>
-        <span className={`text-[#737373] transition-transform duration-300 ${open ? 'rotate-90' : ''}`}>▶</span>
+        <span className="font-semibold" style={{ color: '#f0f0ff', letterSpacing: '0.05em' }}>{title}</span>
+        <span
+          className="transition-transform duration-300"
+          style={{ color: '#7c3aed', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}
+        >
+          ▶
+        </span>
       </button>
 
       {!open && preview && (

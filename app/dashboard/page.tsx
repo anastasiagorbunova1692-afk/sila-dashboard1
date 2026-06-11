@@ -108,9 +108,9 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0a]">
+    <div className="flex min-h-screen" style={{ background: '#080810' }}>
       <Sidebar />
-      <main className="flex-1 md:ml-[220px] p-5 md:p-8">
+      <main className="flex-1 md:ml-[220px] p-5 md:p-8 relative z-10">
         <Header
           title="SILA Картинг — Текущий месяц"
           updatedAt={updatedAt}
@@ -119,12 +119,13 @@ export default function DashboardPage() {
         />
 
         {error && (
-          <div className="bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-xl p-5 mb-6">
-            <p className="text-[#ef4444] font-medium mb-2">Ошибка загрузки данных</p>
-            <p className="text-[#737373] text-sm mb-3">{error}</p>
+          <div className="rounded-xl p-5 mb-6" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+            <p className="font-medium mb-2" style={{ color: '#ef4444' }}>Ошибка загрузки данных</p>
+            <p className="text-sm mb-3" style={{ color: '#8888aa' }}>{error}</p>
             <button
               onClick={load}
-              className="px-4 py-2 rounded-lg bg-[#ef4444]/20 text-[#ef4444] text-sm hover:bg-[#ef4444]/30 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm transition-colors"
+              style={{ background: 'rgba(239,68,68,0.2)', color: '#ef4444' }}
             >
               Попробовать снова
             </button>
@@ -132,15 +133,15 @@ export default function DashboardPage() {
         )}
 
         {!loading && !error && monthData.length === 0 && (
-          <div className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-8 text-center mb-6">
-            <p className="text-[#737373]">Данные появятся после заполнения таблицы</p>
+          <div className="rounded-xl p-8 text-center mb-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p style={{ color: '#8888aa' }}>Данные появятся после заполнения таблицы</p>
           </div>
         )}
 
         {loading && data.length === 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-5 animate-pulse h-28" />
+              <div key={i} className="animate-pulse h-28 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} />
             ))}
           </div>
         ) : (

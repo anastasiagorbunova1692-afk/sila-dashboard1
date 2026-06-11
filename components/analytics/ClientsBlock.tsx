@@ -11,9 +11,16 @@ interface Props { data: MonthlyData[] }
 
 function MiniCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[#1a1a1a] border border-[#1f1f1f] rounded-lg p-3">
-      <p className="text-[#737373] text-xs mb-1">{label}</p>
-      <p className="text-[#f5f5f5] font-bold text-lg">{value}</p>
+    <div
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        padding: '12px 16px',
+      }}
+    >
+      <p className="text-xs mb-1 uppercase" style={{ color: '#8888aa', letterSpacing: '0.1em' }}>{label}</p>
+      <p className="font-bold text-lg" style={{ color: '#f0f0ff' }}>{value}</p>
     </div>
   )
 }
@@ -22,11 +29,14 @@ function FunnelBar({ label, value, max }: { label: string; value: number | null;
   const w = value && max > 0 ? Math.round((value / max) * 100) : 0
   return (
     <div className="flex items-center gap-3 py-1.5">
-      <span className="text-[#737373] text-xs w-36 shrink-0">{label}</span>
-      <div className="flex-1 h-2 bg-[#1f1f1f] rounded-full overflow-hidden">
-        <div className="h-full rounded-full bg-[#22c55e]/60" style={{ width: `${w}%` }} />
+      <span className="text-xs w-36 shrink-0" style={{ color: '#8888aa' }}>{label}</span>
+      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${w}%`, background: 'linear-gradient(90deg, rgba(124,58,237,0.6), rgba(168,85,247,0.6))' }}
+        />
       </div>
-      <span className="text-[#f5f5f5] text-xs w-12 text-right">{formatNum(value)}</span>
+      <span className="text-xs w-12 text-right" style={{ color: '#f0f0ff' }}>{formatNum(value)}</span>
     </div>
   )
 }
@@ -71,21 +81,21 @@ export default function ClientsBlock({ data }: Props) {
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-              <CartesianGrid stroke="#1f1f1f" strokeDasharray="3 3" />
-              <XAxis dataKey="month" tick={{ fill: '#737373', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#737373', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
+              <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+              <XAxis dataKey="month" tick={{ fill: '#8888aa', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#8888aa', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
               <Tooltip
-                contentStyle={{ background: '#1a1a1a', border: '1px solid #1f1f1f', borderRadius: 8 }}
-                labelStyle={{ color: '#737373', fontSize: 12 }}
+                contentStyle={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10 }}
+                labelStyle={{ color: '#8888aa', fontSize: 12 }}
               />
-              <Legend wrapperStyle={{ color: '#737373', fontSize: 12 }} />
-              <Line type="monotone" dataKey="Всего" stroke="#22c55e" strokeWidth={2} dot={{ r: 4, fill: '#22c55e', strokeWidth: 0 }} connectNulls={false} />
-              <Line type="monotone" dataKey="Новых" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} connectNulls={false} />
+              <Legend wrapperStyle={{ color: '#8888aa', fontSize: 12 }} />
+              <Line type="monotone" dataKey="Всего" stroke="#7c3aed" strokeWidth={2} dot={{ r: 4, fill: '#7c3aed', strokeWidth: 0 }} connectNulls={false} />
+              <Line type="monotone" dataKey="Новых" stroke="#a855f7" strokeWidth={2} dot={{ r: 4, fill: '#a855f7', strokeWidth: 0 }} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
         <div>
-          <p className="text-[#737373] text-xs font-medium mb-2 uppercase tracking-wider">Воронка</p>
+          <p className="text-xs font-medium mb-2 uppercase" style={{ color: '#8888aa', letterSpacing: '0.1em' }}>Воронка</p>
           {funnelItems.map((f) => (
             <FunnelBar key={f.label} label={f.label} value={f.value} max={incomingMax} />
           ))}

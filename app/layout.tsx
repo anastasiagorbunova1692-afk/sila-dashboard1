@@ -9,7 +9,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body>{children}</body>
+      <body>
+        <div className="blob-tl" />
+        <div className="blob-br" />
+        {children}
+      </body>
     </html>
   )
 }

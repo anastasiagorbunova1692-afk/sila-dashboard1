@@ -22,16 +22,22 @@ function TreeBar({ label, value, pctOf, indent }: TreeRow) {
 
   return (
     <div className={`flex items-center gap-3 py-1.5 ${indent ? 'pl-6' : ''}`}>
-      <span className={`${indent ? 'text-[#737373] text-xs w-44 shrink-0' : 'text-[#f5f5f5] text-sm font-medium w-44 shrink-0'}`}>
+      <span
+        className={`${indent ? 'text-xs w-44 shrink-0' : 'text-sm font-medium w-44 shrink-0'}`}
+        style={{ color: indent ? '#8888aa' : '#f0f0ff' }}
+      >
         {indent ? '├ ' : ''}{label}
       </span>
-      <div className="flex-1 h-1.5 bg-[#1f1f1f] rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
         {pct !== null && (
-          <div className="h-full rounded-full bg-[#22c55e]/70" style={{ width: `${Math.min(pct, 100)}%` }} />
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${Math.min(pct, 100)}%`, background: 'linear-gradient(90deg, #7c3aed, #a855f7)' }}
+          />
         )}
       </div>
-      <span className={`text-right w-28 text-xs ${indent ? 'text-[#737373]' : 'text-[#f5f5f5]'}`}>{displayVal}</span>
-      {pct !== null && <span className="text-[#737373] text-xs w-10 text-right">({pct}%)</span>}
+      <span className="text-right w-28 text-xs" style={{ color: indent ? '#8888aa' : '#f0f0ff' }}>{displayVal}</span>
+      {pct !== null && <span className="text-xs w-10 text-right" style={{ color: '#8888aa' }}>({pct}%)</span>}
     </div>
   )
 }
@@ -66,20 +72,20 @@ export default function ExpensesTree({ data }: Props) {
     <div className="h-40">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={topData} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 80 }}>
-          <CartesianGrid stroke="#1f1f1f" strokeDasharray="3 3" horizontal={false} />
+          <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" horizontal={false} />
           <XAxis
             type="number"
-            tick={{ fill: '#737373', fontSize: 11 }}
+            tick={{ fill: '#8888aa', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => v >= 1000000 ? (v / 1000000).toFixed(1) + 'М' : v >= 1000 ? (v / 1000).toFixed(0) + 'К' : v}
           />
-          <YAxis dataKey="name" type="category" tick={{ fill: '#737373', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+          <YAxis dataKey="name" type="category" tick={{ fill: '#8888aa', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
           <Tooltip
-            contentStyle={{ background: '#1a1a1a', border: '1px solid #1f1f1f', borderRadius: 8 }}
+            contentStyle={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10 }}
             formatter={(v: number) => [formatRub(v)]}
           />
-          <Bar dataKey="value" fill="#22c55e" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="value" fill="#7c3aed" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -87,9 +93,11 @@ export default function ExpensesTree({ data }: Props) {
 
   return (
     <Accordion title="Расходы" preview={preview}>
-      <div className="mt-2 divide-y divide-[#1f1f1f]/50">
+      <div className="mt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         {rows.map((r) => (
-          <TreeBar key={r.label} {...r} />
+          <div key={r.label} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <TreeBar {...r} />
+          </div>
         ))}
       </div>
     </Accordion>
