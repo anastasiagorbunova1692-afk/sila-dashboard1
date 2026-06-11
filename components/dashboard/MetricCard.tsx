@@ -1,17 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 
 interface MetricCardProps {
   label: string
   value: string
   subValue?: string
-  subValueAccent?: string  // displayed after subValue in accent color
-  progressPct?: number     // 0-100, renders a thin progress bar if provided
+  subValueAccent?: string
+  progressPct?: number
+  color?: string
+  // spark/sparkData accepted but intentionally unused (removed from UI)
+  spark?: number[]
   sparkData?: number[]
-  color?: string           // override value text color
-  spark?: number[]         // alias accepted from page (mapped to sparkData)
 }
 
 export default function MetricCard({
@@ -20,13 +20,9 @@ export default function MetricCard({
   subValue,
   subValueAccent,
   progressPct,
-  sparkData,
   color,
-  spark,
 }: MetricCardProps) {
-  const data = sparkData ?? spark ?? []
   const [hovered, setHovered] = useState(false)
-  const chartData = data.map((v, i) => ({ i, v: v ?? 0 }))
 
   return (
     <div
@@ -37,24 +33,27 @@ export default function MetricCard({
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: hovered ? '1px solid rgba(124,58,237,0.5)' : '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 16,
+        borderRadius: 12,
         boxShadow: hovered ? '0 4px 32px rgba(124,58,237,0.15)' : '0 4px 24px rgba(0,0,0,0.4)',
-        padding: '12px 16px',
+        padding: 16,
         transition: 'all 0.3s ease',
       }}
     >
       <p
-        className="text-xs font-medium mb-2 uppercase"
-        style={{ color: '#8888aa', letterSpacing: '0.1em' }}
+        className="uppercase"
+        style={{ fontSize: 11, color: '#8888aa', letterSpacing: '0.08em', marginBottom: 6 }}
       >
         {label}
       </p>
-      <p className="text-xl font-bold leading-tight" style={{ color: color ?? '#f0f0ff' }}>{value}</p>
+
+      <p style={{ fontSize: '1.4rem', fontWeight: 700, color: color ?? '#f0f0ff', lineHeight: 1.2 }}>
+        {value}
+      </p>
 
       {(subValue || subValueAccent) && (
-        <p className="text-sm mt-0.5">
-          {subValue && <span style={{ color: '#8888aa' }}>{subValue}</span>}
-          {subValue && subValueAccent && <span style={{ color: '#8888aa' }}> · </span>}
+        <p style={{ fontSize: 12, color: '#8888aa', marginTop: 4 }}>
+          {subValue && <span>{subValue}</span>}
+          {subValue && subValueAccent && <span> · </span>}
           {subValueAccent && <span style={{ color: '#a855f7' }}>{subValueAccent}</span>}
         </p>
       )}
@@ -62,7 +61,7 @@ export default function MetricCard({
       {progressPct !== undefined && (
         <div
           style={{
-            height: 4,
+            height: 3,
             borderRadius: 999,
             background: 'rgba(255,255,255,0.06)',
             overflow: 'hidden',
@@ -78,30 +77,6 @@ export default function MetricCard({
               transition: 'width 0.4s ease',
             }}
           />
-        </div>
-      )}
-
-      {chartData.length > 1 && (
-        <div className="mt-2 h-6">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id={`sg-${label.replace(/\s/g,'')}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#7c3aed" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="v"
-                stroke="#7c3aed"
-                strokeWidth={1.5}
-                fill={`url(#sg-${label.replace(/\s/g,'')})`}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
         </div>
       )}
     </div>
