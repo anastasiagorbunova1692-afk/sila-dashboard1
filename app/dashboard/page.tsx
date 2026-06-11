@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header'
 import MetricCard from '@/components/dashboard/MetricCard'
 import RevenueChart from '@/components/dashboard/RevenueChart'
 import DailyTable from '@/components/dashboard/DailyTable'
+import MtdBlock from '@/components/dashboard/MtdBlock'
 import { fetchDashboard, type DashboardRow } from '@/lib/sheets'
 import { formatRubShort, formatNum } from '@/lib/formatters'
 
@@ -151,7 +152,10 @@ export default function DashboardPage() {
             <div className="mb-6">
               <RevenueChart data={monthData} />
             </div>
-            <DailyTable data={monthData} />
+            {data.length > 0 && <MtdBlock allData={data} />}
+            <div className="mt-6">
+              <DailyTable data={monthData} />
+            </div>
           </>
         )}
       </main>
