@@ -10,18 +10,12 @@ import { fetchDashboard, type DashboardRow } from '@/lib/sheets'
 import { formatRubShort, formatNum } from '@/lib/formatters'
 
 function filterCurrentMonth(rows: DashboardRow[]): DashboardRow[] {
-  const now = new Date()
-  now.setHours(23, 59, 59, 999)
+  const today = new Date()
   return rows.filter((r) => {
     if (!r.date) return false
-    const d = new Date(r.date)
-    // same month/year, not a future date, and has at least some data
-    return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d <= now &&
-      ((r.revenue ?? 0) > 0 || (r.races ?? 0) > 0 || (r.clients ?? 0) > 0)
-    )
+    // r.date is always "YYYY-MM-DD" built from local Date components — safe to split
+    const [y, m] = r.date.split('-').map(Number)
+    return y === today.getFullYear() && m === today.getMonth() + 1
   })
 }
 

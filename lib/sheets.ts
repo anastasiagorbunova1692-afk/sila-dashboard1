@@ -129,25 +129,29 @@ function gv(
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
+// gviz encodes dates as "Date(year,month0,day)" where month is 0-indexed.
+export function parseGvizDate(val: unknown): Date | null {
+  if (!val) return null
+  const match = String(val).match(/Date\((\d+),(\d+),(\d+)\)/)
+  if (!match) return null
+  return new Date(parseInt(match[1]), parseInt(match[2]), parseInt(match[3]))
+}
+
 export async function fetchDashboard(): Promise<DashboardRow[]> {
-  const rows = await fetchSheet('Dashboard', 'A1:I500')
+  const rows = await fetchSheet('Dashboard', 'A1:I1000')
   const result: DashboardRow[] = []
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i]
     if (!r || !r[0]) continue
-    const dateVal = r[0]
-    let dateStr = ''
-    if (typeof dateVal === 'string' && dateVal.startsWith('Date(')) {
-      const m = dateVal.match(/Date\((\d+),(\d+),(\d+)/)
-      if (m) {
-        const d = new Date(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]))
-        dateStr = d.toISOString().split('T')[0]
-      }
-    } else if (dateVal instanceof Date) {
-      dateStr = (dateVal as Date).toISOString().split('T')[0]
-    } else {
-      dateStr = String(dateVal)
-    }
+    const parsed = parseGvizDate(r[0])
+    if (!parsed) continue
+    // Store as local ISO date string (YYYY-MM-DD) using local year/month/day
+    // so comparisons with `new Date()` stay in the same timezone.
+    const dateStr = [
+      parsed.getFullYear(),
+      String(parsed.getMonth() + 1).padStart(2, '0'),
+      String(parsed.getDate()).padStart(2, '0'),
+    ].join('-')
     result.push({
       date: dateStr,
       revenue: parseSheetsValue(r[1]),

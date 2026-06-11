@@ -13,19 +13,10 @@ function numCell(v: number | null | undefined) {
 }
 
 export default function DailyTable({ data }: Props) {
-  const now = new Date()
-  now.setHours(23, 59, 59, 999)
-
+  // Data is already filtered to current month by the page.
+  // Sort descending so most recent date is at the top.
   const rows = data
-    .filter((r) => {
-      if (!r.date) return false
-      const d = new Date(r.date)
-      if (d > now) return false
-      return (
-        r.revenue !== null || r.revenueRaces !== null ||
-        r.races !== null || r.clients !== null
-      )
-    })
+    .filter((r) => Boolean(r.date))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   return (
