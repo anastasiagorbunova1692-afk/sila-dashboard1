@@ -26,7 +26,6 @@ interface MonthData {
   // Calculated (stored too)
   ebitda: string
   ebitdaMargin: string
-  opMargin: string
   // Balances
   balanceTotal: string
   balanceGorbunova: string
@@ -45,7 +44,7 @@ const EMPTY: MonthData = {
   month: MONTHS[0],
   revenue: '', revenueRaces: '', revenueEvents: '', revenueCerts: '', revenueAbos: '',
   expenses: '', expOp: '',
-  ebitda: '', ebitdaMargin: '', opMargin: '',
+  ebitda: '', ebitdaMargin: '',
   balanceTotal: '', balanceGorbunova: '', balanceSafe: '',
   clientsTotal: '', clientsNew: '', incomingTraffic: '', leadsRaces: '', racesTotal: '',
   trackLoad: '',
@@ -180,7 +179,7 @@ function TopCard({ label, value, prev, valueStr }: {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-type SortKey = 'month' | 'revenue' | 'ebitda' | 'ebitdaMargin' | 'opMargin' | 'expenses' | 'clientsTotal' | 'racesTotal' | 'trackLoad'
+type SortKey = 'month' | 'revenue' | 'ebitda' | 'ebitdaMargin' | 'expenses' | 'clientsTotal' | 'racesTotal' | 'trackLoad'
 type SortDir = 'asc' | 'desc'
 type ChartMetric = 'revenue' | 'ebitda' | 'expenses' | 'clientsTotal' | 'racesTotal'
 
@@ -198,7 +197,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  // Auto-calculated fields
+  // Auto-calculated fields (update in real-time as user types)
   const calcEbitda = (() => {
     const r = n(form.revenue), op = n(form.expOp)
     if (r !== null && op !== null) return (r - op).toFixed(0)
@@ -207,11 +206,6 @@ export default function AnalyticsPage() {
   const calcMargin = (() => {
     const r = n(form.revenue), eb = n(calcEbitda)
     if (r !== null && eb !== null && r !== 0) return (eb / r * 100).toFixed(1)
-    return ''
-  })()
-  const calcOpMargin = (() => {
-    const r = n(form.revenue), op = n(form.expOp)
-    if (r !== null && op !== null && r !== 0) return ((r - op) / r * 100).toFixed(1)
     return ''
   })()
 
@@ -234,7 +228,7 @@ export default function AnalyticsPage() {
   }
 
   function handleSave() {
-    const toSave = { ...form, ebitda: calcEbitda, ebitdaMargin: calcMargin, opMargin: calcOpMargin }
+    const toSave = { ...form, ebitda: calcEbitda, ebitdaMargin: calcMargin }
     saveMonth(toSave); refresh()
     setToast(isEditing ? `Данные за ${form.month} обновлены ✓` : `Данные за ${form.month} сохранены ✓`)
     setIsEditing(false)
@@ -425,7 +419,6 @@ export default function AnalyticsPage() {
                         <SortTh label="Выручка" sk="revenue" />
                         <SortTh label="EBITDA" sk="ebitda" />
                         <SortTh label="Маржа%" sk="ebitdaMargin" />
-                        <SortTh label="Оп.маржа%" sk="opMargin" />
                         <SortTh label="Расходы" sk="expenses" />
                         <SortTh label="Клиентов" sk="clientsTotal" />
                         <SortTh label="Заездов" sk="racesTotal" />
@@ -447,7 +440,6 @@ export default function AnalyticsPage() {
                             <td className="py-2.5 pr-4" style={{ color: n(m.ebitdaMargin) !== null && n(m.ebitdaMargin)! >= 0 ? '#22c55e' : '#ef4444' }}>
                               {m.ebitdaMargin ? m.ebitdaMargin + '%' : '—'}
                             </td>
-                            <td className="py-2.5 pr-4" style={{ color: '#f0f0ff' }}>{m.opMargin ? m.opMargin + '%' : '—'}</td>
                             <td className="py-2.5 pr-4" style={{ color: '#f0f0ff' }}>{fmt(m.expenses, formatRub)}</td>
                             <td className="py-2.5 pr-4" style={{ color: '#f0f0ff' }}>{fmt(m.clientsTotal, formatNum)}</td>
                             <td className="py-2.5 pr-4" style={{ color: '#f0f0ff' }}>{fmt(m.racesTotal, formatNum)}</td>
@@ -502,7 +494,6 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Расходы общие" unit="руб" value={form.expenses} onChange={set('expenses')} />
               <Field label="Расходы операционные" unit="руб" value={form.expOp} onChange={set('expOp')} />
-              <CalcField label="Операционная маржа, %" value={calcOpMargin ? calcOpMargin + '%' : ''} />
             </div>
 
             <SectionHeader title="Результат" />
