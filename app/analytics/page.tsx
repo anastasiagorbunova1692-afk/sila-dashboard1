@@ -200,13 +200,13 @@ export default function AnalyticsPage() {
 
   // Auto-calculated fields
   const calcEbitda = (() => {
-    const r = n(form.revenue), e = n(form.expenses)
-    if (r !== null && e !== null) return (r - e).toFixed(0)
+    const r = n(form.revenue), op = n(form.expOp)
+    if (r !== null && op !== null) return (r - op).toFixed(0)
     return ''
   })()
   const calcMargin = (() => {
     const r = n(form.revenue), eb = n(calcEbitda)
-    if (r && eb !== null && r !== 0) return (eb / r * 100).toFixed(1)
+    if (r !== null && eb !== null && r !== 0) return (eb / r * 100).toFixed(1)
     return ''
   })()
   const calcOpMargin = (() => {
