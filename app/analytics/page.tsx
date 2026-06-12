@@ -112,6 +112,7 @@ function glassCard(extra?: React.CSSProperties): React.CSSProperties {
 export default function AnalyticsPage() {
   const [tab, setTab] = useState<'view' | 'enter'>('view')
   const [form, setForm] = useState<MonthData>(EMPTY)
+  const [isEditing, setIsEditing] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [savedMonths, setSavedMonths] = useState<MonthData[]>([])
 
@@ -125,12 +126,27 @@ export default function AnalyticsPage() {
 
   function handleMonthChange(month: string) {
     setForm(loadMonth(month))
+    setIsEditing(false)
+  }
+
+  function handleEdit(m: MonthData) {
+    setForm(m)
+    setIsEditing(true)
+    setTab('enter')
+  }
+
+  function handleDelete(month: string) {
+    if (!window.confirm(`Удалить данные за ${month}?`)) return
+    localStorage.removeItem(storageKey(month))
+    setSavedMonths(loadAllMonths())
   }
 
   function handleSave() {
     saveMonth(form)
     setSavedMonths(loadAllMonths())
-    setToast(`Данные за ${form.month} сохранены ✓`)
+    const msg = isEditing ? `Данные за ${form.month} обновлены ✓` : `Данные за ${form.month} сохранены ✓`
+    setToast(msg)
+    setIsEditing(false)
     setTimeout(() => setToast(null), 3000)
   }
 
@@ -187,7 +203,7 @@ export default function AnalyticsPage() {
                 <table className="w-full text-sm whitespace-nowrap">
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                      {['Месяц','Выручка','EBITDA','Маржа %','Расходы','Клиентов','Заездов'].map((h) => (
+                      {['Месяц','Выручка','EBITDA','Маржа %','Расходы','Клиентов','Заездов',''].map((h) => (
                         <th key={h} className="text-left py-2 pr-6 font-medium uppercase" style={{ color: '#8888aa', fontSize: 11, letterSpacing: '0.1em' }}>{h}</th>
                       ))}
                     </tr>
@@ -206,6 +222,24 @@ export default function AnalyticsPage() {
                         <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>{fmt(m.expenses, formatRub)}</td>
                         <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>{fmt(m.clientsTotal, formatNum)}</td>
                         <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>{fmt(m.racesTotal, formatNum)}</td>
+                        <td className="py-2.5" style={{ whiteSpace: 'nowrap' }}>
+                          <button
+                            onClick={() => handleEdit(m)}
+                            style={{ fontSize: 12, color: '#a855f7', background: 'none', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', marginRight: 4 }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.1)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                          >
+                            Редактировать
+                          </button>
+                          <button
+                            onClick={() => handleDelete(m.month)}
+                            style={{ fontSize: 12, color: '#ef4444', background: 'none', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                          >
+                            Удалить
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -222,7 +256,7 @@ export default function AnalyticsPage() {
               <label className="block text-xs mb-1" style={{ color: '#8888aa' }}>Месяц</label>
               <select
                 value={form.month}
-                onChange={(e) => handleMonthChange(e.target.value)}
+                onChange={(e) => { handleMonthChange(e.target.value); setIsEditing(false) }}
                 style={{
                   background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 8, color: '#f0f0ff', padding: '8px 12px', fontSize: 14, outline: 'none', cursor: 'pointer',
@@ -283,7 +317,7 @@ export default function AnalyticsPage() {
                   fontSize: 15, fontWeight: 600, border: 'none', cursor: 'pointer',
                 }}
               >
-                Сохранить данные
+                {isEditing ? `Обновить данные за ${form.month}` : 'Сохранить данные'}
               </button>
             </div>
           </div>
