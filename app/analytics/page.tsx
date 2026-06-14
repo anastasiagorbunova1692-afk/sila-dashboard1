@@ -235,6 +235,48 @@ export default function AnalyticsPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  function handleExport() {
+    const data: Record<string, unknown> = {}
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('analytics_month_')) {
+        try { data[key] = JSON.parse(localStorage.getItem(key) ?? '') } catch {}
+      }
+    })
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sila-analytics-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string) as Record<string, unknown>
+        let count = 0
+        Object.entries(parsed).forEach(([key, val]) => {
+          if (key.startsWith('analytics_month_')) {
+            localStorage.setItem(key, JSON.stringify(val))
+            count++
+          }
+        })
+        refresh()
+        setToast(`Импортировано ${count} ${count === 1 ? 'месяц' : count < 5 ? 'месяца' : 'месяцев'} ✓`)
+        setTimeout(() => setToast(null), 3000)
+      } catch {
+        setToast('Ошибка импорта — неверный формат файла')
+        setTimeout(() => setToast(null), 3000)
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
   function calcTrackLoad() {
     const races = n(form.racesTotal)
     if (races !== null) set('trackLoad')((races / 180 * 100).toFixed(1))
@@ -333,6 +375,37 @@ export default function AnalyticsPage() {
         {tab === 'view' && (
           saved.length === 0 ? NO_DATA : (
             <div className="space-y-4">
+
+              {/* Warning + export/import */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 10, padding: '8px 14px', fontSize: 13, color: '#fbbf24' }}>
+                  ⚠️ Данные хранятся в браузере. Сделайте экспорт для резервной копии.
+                </div>
+                <div className="flex gap-2">
+                  {(['export', 'import'] as const).map(type => {
+                    const btnStyle: React.CSSProperties = {
+                      fontSize: 13, padding: '7px 16px', borderRadius: 8, cursor: 'pointer',
+                      border: '1px solid rgba(124,58,237,0.5)', color: '#a855f7', background: 'transparent',
+                    }
+                    if (type === 'export') return (
+                      <button key="exp" style={btnStyle}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.1)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        onClick={handleExport}>
+                        Экспорт данных
+                      </button>
+                    )
+                    return (
+                      <label key="imp" style={{ ...btnStyle, display: 'inline-block' }}
+                        onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.1)')}
+                        onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}>
+                        Импорт данных
+                        <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
 
               {/* Top cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
