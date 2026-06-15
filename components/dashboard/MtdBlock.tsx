@@ -155,7 +155,7 @@ export default function MtdBlock({ allData }: Props) {
                 <th
                   key={h}
                   className="text-left font-medium py-2 pr-6 uppercase"
-                  style={{ color: '#8888aa', fontSize: 11, letterSpacing: '0.1em' }}
+                  style={{ color: '#8888aa', fontSize: 11, letterSpacing: '0.1em', position: 'sticky', top: 0, zIndex: 10, background: '#0d0d1a', backdropFilter: 'blur(10px)' }}
                 >
                   {h}
                 </th>
