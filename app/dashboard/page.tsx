@@ -72,9 +72,8 @@ export default function DashboardPage() {
   const TRACK_CAPACITY = 180
   const today = new Date().getDate()
   const avgRevenuePerDay = today > 0 ? totalRevenue / today : null
-  const daysWithRides = monthData.filter((r) => (r.races ?? 0) > 0)
-  const avgLoad = daysWithRides.length > 0
-    ? parseFloat((daysWithRides.reduce((s, r) => s + (r.races ?? 0) / TRACK_CAPACITY * 100, 0) / daysWithRides.length).toFixed(1))
+  const avgLoad = today > 0 && totalRacesCount > 0
+    ? parseFloat((totalRacesCount / (TRACK_CAPACITY * today) * 100).toFixed(1))
     : null
   const loadColor = avgLoad === null ? '#8888aa' : avgLoad >= 70 ? '#22c55e' : avgLoad >= 40 ? '#f59e0b' : '#ef4444'
 
