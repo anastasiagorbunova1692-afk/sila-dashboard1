@@ -8,6 +8,7 @@ import RevenueChart from '@/components/dashboard/RevenueChart'
 import DailyTable from '@/components/dashboard/DailyTable'
 import MtdBlock from '@/components/dashboard/MtdBlock'
 import RevenueBreakdown from '@/components/dashboard/RevenueBreakdown'
+import PlanBlock from '@/components/dashboard/PlanBlock'
 import { fetchDashboard, type DashboardRow } from '@/lib/sheets'
 import { formatRubShort, formatNum } from '@/lib/formatters'
 
@@ -186,6 +187,9 @@ export default function DashboardPage() {
           <>
             <div className="mb-4">
               <RevenueChart data={monthData} />
+            </div>
+            <div className="mt-4">
+              <PlanBlock totalRevenue={totalRevenue} />
             </div>
             {data.length > 0 && <MtdBlock allData={data} />}
             <div className="mt-6">
