@@ -3,18 +3,32 @@ import { NextRequest, NextResponse } from 'next/server'
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRga7jflxMELmI9t4r9MvDaU7lFsJqp-HcYY39kBypp401GuLisjheAcHy4mIn1ZqDyg/exec'
 
 export async function GET() {
-  const res = await fetch(SCRIPT_URL, { cache: 'no-store' })
-  const data = await res.json()
-  return NextResponse.json(data)
+  try {
+    const res = await fetch(SCRIPT_URL, {
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const text = await res.text()
+    const data = JSON.parse(text)
+    return NextResponse.json(data)
+  } catch (err) {
+    return NextResponse.json({ success: false, error: String(err) }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const res = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  return NextResponse.json(data)
+  try {
+    const body = await req.json()
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      redirect: 'follow',
+    })
+    const text = await res.text()
+    const data = JSON.parse(text)
+    return NextResponse.json(data)
+  } catch (err) {
+    return NextResponse.json({ success: false, error: String(err) }, { status: 500 })
+  }
 }
