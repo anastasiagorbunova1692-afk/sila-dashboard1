@@ -157,7 +157,7 @@ export default function MtdBlock({ allData }: Props) {
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               {(['Месяц', 'Выручка MTD', 'Выручка полная', 'Ср. день', 'Заездов', 'Клиентов', 'vs пред. месяц'] as string[]).map((h) => (
-                <th key={h} className="text-left font-medium py-2 pr-6 uppercase" style={TH_STYLE}>
+                <th key={h} className="text-left font-medium py-2 pr-6 uppercase" style={{ ...TH_STYLE, color: h === 'Выручка MTD' ? '#22c55e' : '#8888aa' }}>
                   {h}
                 </th>
               ))}
@@ -185,7 +185,7 @@ export default function MtdBlock({ allData }: Props) {
                     {m.label}
                     {m.isCurrent && <span className="ml-2 text-xs font-normal" style={{ color: '#8888aa' }}>текущий</span>}
                   </td>
-                  <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>
+                  <td className="py-2.5 pr-6 font-medium" style={{ color: m.isCurrent ? '#a855f7' : '#22c55e' }}>
                     {m.revenueMtd !== null ? formatRub(m.revenueMtd) : '—'}
                   </td>
                   <td className="py-2.5 pr-6" style={{ color: m.isCurrent ? '#8888aa' : '#f0f0ff' }}>
@@ -195,7 +195,7 @@ export default function MtdBlock({ allData }: Props) {
                         : formatRub(m.revenueFull)
                       : '—'}
                   </td>
-                  <td className="py-2.5 pr-6" style={{ color: '#8888aa' }}>
+                  <td className="py-2.5 pr-6" style={{ color: '#737373' }}>
                     {formatAvg(m.avgPerDay)}
                   </td>
                   <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>
