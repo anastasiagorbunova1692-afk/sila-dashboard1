@@ -69,6 +69,8 @@ export default function DashboardPage() {
     : null
 
   const TRACK_CAPACITY = 180
+  const today = new Date().getDate()
+  const avgRevenuePerDay = today > 0 ? totalRevenue / today : null
   const daysWithRides = monthData.filter((r) => (r.races ?? 0) > 0)
   const avgLoad = daysWithRides.length > 0
     ? parseFloat((daysWithRides.reduce((s, r) => s + (r.races ?? 0) / TRACK_CAPACITY * 100, 0) / daysWithRides.length).toFixed(1))
@@ -80,6 +82,11 @@ export default function DashboardPage() {
       label: 'Выручка общая',
       value: formatRubShort(totalRevenue),
       spark: getLast7(monthData.map((r) => r.revenue)),
+    },
+    {
+      label: 'Выручка / день',
+      value: avgRevenuePerDay !== null ? formatRubShort(avgRevenuePerDay) : '—',
+      subValue: `среднее за ${today} дней`,
     },
     {
       label: 'Выручка заезды',
@@ -156,7 +163,7 @@ export default function DashboardPage() {
 
         {loading && data.length === 0 ? (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-            {Array.from({ length: 7 }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="animate-pulse h-24 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }} />
             ))}
           </div>
