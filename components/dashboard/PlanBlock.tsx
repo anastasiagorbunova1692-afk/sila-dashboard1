@@ -99,6 +99,7 @@ export default function PlanBlock({ totalRevenue }: Props) {
   const [editing, setEditing] = useState(false)
   const [realInput, setRealInput] = useState('')
   const [posInput, setPosInput] = useState('')
+  const [toast, setToast] = useState(false)
 
   useEffect(() => {
     setPlan(loadPlan(now))
@@ -133,6 +134,25 @@ export default function PlanBlock({ totalRevenue }: Props) {
     savePlan(now, newPlan)
     setPlan(newPlan)
     setEditing(false)
+    setToast(true)
+    setTimeout(() => setToast(false), 5000)
+  }
+
+  function handleExport() {
+    const data: Record<string, unknown> = {}
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('plan_') || k.startsWith('analytics_month_')) {
+        try { data[k] = JSON.parse(localStorage.getItem(k) ?? '') } catch {}
+      }
+    })
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sila-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setToast(false)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -233,6 +253,21 @@ export default function PlanBlock({ totalRevenue }: Props) {
             today={today}
             daysInMonth={daysInMonth}
           />
+        </div>
+      )}
+
+      {/* Backup reminder toast */}
+      {toast && (
+        <div style={{
+          marginTop: 12, padding: '10px 14px', borderRadius: 10, fontSize: 13,
+          background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
+          color: '#22c55e', display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span>План сохранён ✓ &nbsp;Совет: сделайте экспорт для резервной копии.</span>
+          <button onClick={handleExport} style={{ fontSize: 12, color: '#a855f7', background: 'none', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 6, padding: '2px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Экспорт
+          </button>
+          <button onClick={() => setToast(false)} style={{ marginLeft: 'auto', fontSize: 16, color: '#8888aa', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
       )}
     </div>

@@ -89,8 +89,60 @@ export default function Sidebar() {
           })}
         </nav>
 
-        <div className="px-6 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-[#8888aa] text-xs">v1.0</p>
+        <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-[#8888aa] text-xs mb-2">v1.0</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const data: Record<string, unknown> = {}
+                Object.keys(localStorage).forEach(k => {
+                  if (k.startsWith('plan_') || k.startsWith('analytics_month_')) {
+                    try { data[k] = JSON.parse(localStorage.getItem(k) ?? '') } catch {}
+                  }
+                })
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `sila-backup-${new Date().toISOString().slice(0, 10)}.json`
+                a.click()
+                URL.revokeObjectURL(url)
+              }}
+              title="Экспорт всех данных"
+              style={{ fontSize: 11, color: '#8888aa', background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', flex: 1 }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#a855f7')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#8888aa')}
+            >
+              💾 Экспорт
+            </button>
+            <label
+              title="Импорт данных из файла"
+              style={{ fontSize: 11, color: '#8888aa', background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', flex: 1, textAlign: 'center' }}
+              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#a855f7')}
+              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#8888aa')}
+            >
+              📂 Импорт
+              <input type="file" accept=".json" style={{ display: 'none' }} onChange={e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                const reader = new FileReader()
+                reader.onload = ev => {
+                  try {
+                    const parsed = JSON.parse(ev.target?.result as string) as Record<string, unknown>
+                    let count = 0
+                    Object.entries(parsed).forEach(([k, v]) => {
+                      if (k.startsWith('plan_') || k.startsWith('analytics_month_')) {
+                        localStorage.setItem(k, JSON.stringify(v)); count++
+                      }
+                    })
+                    alert(`Восстановлено ${count} записей`)
+                  } catch { alert('Ошибка импорта — неверный формат файла') }
+                }
+                reader.readAsText(file)
+                e.target.value = ''
+              }} />
+            </label>
+          </div>
         </div>
       </aside>
     </>
