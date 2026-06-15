@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { formatRub } from '@/lib/formatters'
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRga7jflxMELmI9t4r9MvDaU7lFsJqp-HcYY39kBypp401GuLisjheAcHy4mIn1ZqDyg/exec'
+const API_URL = '/api/plans'
 
 interface Plan {
   real: number
@@ -41,7 +41,7 @@ function saveToLocal(year: number, month: number, plan: Plan) {
 }
 
 async function fetchPlans(): Promise<Record<string, Plan>> {
-  const res = await fetch(SCRIPT_URL, { cache: 'no-store' })
+  const res = await fetch(API_URL + '?t=' + Date.now())
   const data = await res.json() as { plans?: Record<string, { realPlan: number; positivePlan: number }> }
   const plans: Record<string, Plan> = {}
   for (const [k, v] of Object.entries(data.plans ?? {})) {
@@ -51,8 +51,9 @@ async function fetchPlans(): Promise<Record<string, Plan>> {
 }
 
 async function savePlanRemote(year: number, month: number, plan: Plan): Promise<void> {
-  await fetch(SCRIPT_URL, {
+  await fetch(API_URL, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ month: planKey(year, month), realPlan: plan.real, positivePlan: plan.positive }),
   })
 }
