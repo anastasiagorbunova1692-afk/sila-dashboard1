@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { formatRub } from '@/lib/formatters'
+
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRga7jflxMELmI9t4r9MvDaU7lFsJqp-HcYY39kBypp401GuLisjheAcHy4mIn1ZqDyg/exec'
 
 interface Plan {
   real: number
@@ -13,23 +15,46 @@ interface Props {
 }
 
 const MONTH_NAMES_RU = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь']
-const MONTH_NAMES_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
 
-function planKey(date: Date) {
-  return `plan_${date.getFullYear()}_${String(date.getMonth() + 1).padStart(2, '0')}`
+function planKey(year: number, month: number) {
+  return `${year}_${String(month + 1).padStart(2, '0')}`
 }
 
-function loadPlan(date: Date): Plan | null {
+function localKey(year: number, month: number) {
+  return `plan_${planKey(year, month)}`
+}
+
+function loadFromLocal(year: number, month: number): Plan | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = localStorage.getItem(planKey(date))
-    if (raw) return JSON.parse(raw)
+    const raw = localStorage.getItem(localKey(year, month))
+    if (raw) {
+      const p = JSON.parse(raw)
+      return { real: p.real ?? p.realPlan ?? 0, positive: p.positive ?? p.positivePlan ?? 0 }
+    }
   } catch {}
   return null
 }
 
-function savePlan(date: Date, plan: Plan) {
-  localStorage.setItem(planKey(date), JSON.stringify(plan))
+function saveToLocal(year: number, month: number, plan: Plan) {
+  localStorage.setItem(localKey(year, month), JSON.stringify(plan))
+}
+
+async function fetchPlans(): Promise<Record<string, Plan>> {
+  const res = await fetch(SCRIPT_URL, { cache: 'no-store' })
+  const data = await res.json() as { plans?: Record<string, { realPlan: number; positivePlan: number }> }
+  const plans: Record<string, Plan> = {}
+  for (const [k, v] of Object.entries(data.plans ?? {})) {
+    plans[k] = { real: v.realPlan, positive: v.positivePlan }
+  }
+  return plans
+}
+
+async function savePlanRemote(year: number, month: number, plan: Plan): Promise<void> {
+  await fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ month: planKey(year, month), realPlan: plan.real, positivePlan: plan.positive }),
+  })
 }
 
 function PlanCard({
@@ -56,38 +81,18 @@ function PlanCard({
   }
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 12,
-      padding: 16,
-      flex: 1,
-    }}>
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16, flex: 1 }}>
       <p style={{ fontSize: 11, color: '#8888aa', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{label}</p>
-
       <div className="flex justify-between items-baseline mb-1">
         <span style={{ fontSize: 13, color: '#f0f0ff' }}>{formatRub(revenue)}</span>
         <span style={{ fontSize: 12, color: '#8888aa' }}>из {formatRub(plan)}</span>
       </div>
-
-      {/* Progress bar */}
       <div style={{ height: 12, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 8 }}>
-        <div style={{
-          height: '100%',
-          width: `${Math.min(completionPct, 100)}%`,
-          borderRadius: 999,
-          background: gradientMap[color],
-          transition: 'width 0.5s ease',
-        }} />
+        <div style={{ height: '100%', width: `${Math.min(completionPct, 100)}%`, borderRadius: 999, background: gradientMap[color], transition: 'width 0.5s ease' }} />
       </div>
-
       <div className="flex justify-between">
-        <span style={{ fontSize: 13, fontWeight: 600, color }}>
-          {completionPct.toFixed(1)}% выполнено
-        </span>
-        <span style={{ fontSize: 12, color: '#8888aa' }}>
-          {today} из {daysInMonth} дн. ({daysElapsedPct.toFixed(0)}%)
-        </span>
+        <span style={{ fontSize: 13, fontWeight: 600, color }}>{completionPct.toFixed(1)}% выполнено</span>
+        <span style={{ fontSize: 12, color: '#8888aa' }}>{today} из {daysInMonth} дн. ({daysElapsedPct.toFixed(0)}%)</span>
       </div>
     </div>
   )
@@ -95,64 +100,73 @@ function PlanCard({
 
 export default function PlanBlock({ totalRevenue }: Props) {
   const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const today = now.getDate()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const daysElapsedPct = (today / daysInMonth) * 100
+  const monthLabel = `${MONTH_NAMES_RU[month]} ${year}`
+  const key = planKey(year, month)
+
   const [plan, setPlan] = useState<Plan | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [networkError, setNetworkError] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [realInput, setRealInput] = useState('')
   const [posInput, setPosInput] = useState('')
   const [toast, setToast] = useState(false)
 
-  useEffect(() => {
-    setPlan(loadPlan(now))
+  const loadPlans = useCallback(async () => {
+    setLoading(true)
+    setNetworkError(false)
+    try {
+      const plans = await fetchPlans()
+      const p = plans[key] ?? null
+      if (p) {
+        saveToLocal(year, month, p)
+        setPlan(p)
+      } else {
+        setPlan(null)
+      }
+    } catch {
+      setNetworkError(true)
+      setPlan(loadFromLocal(year, month))
+    } finally {
+      setLoading(false)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [key])
 
-  const today = now.getDate()
-  const month = now.getMonth()
-  const year = now.getFullYear()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const daysElapsedPct = (today / daysInMonth) * 100
-
-  const monthLabel = `${MONTH_NAMES_RU[month]} ${year}`
-  const hasPlan = plan !== null
+  useEffect(() => { loadPlans() }, [loadPlans])
 
   function openForm() {
-    if (plan) {
-      setRealInput(String(plan.real))
-      setPosInput(String(plan.positive))
-    } else {
-      setRealInput('')
-      setPosInput('')
-    }
+    setRealInput(plan ? String(plan.real) : '')
+    setPosInput(plan ? String(plan.positive) : '')
     setEditing(true)
   }
 
-  function handleSave() {
+  async function handleSave() {
     const r = parseFloat(realInput)
     const p = parseFloat(posInput)
     if (!r || !p) return
     const newPlan = { real: r, positive: p }
-    savePlan(now, newPlan)
-    setPlan(newPlan)
-    setEditing(false)
-    setToast(true)
-    setTimeout(() => setToast(false), 5000)
-  }
-
-  function handleExport() {
-    const data: Record<string, unknown> = {}
-    Object.keys(localStorage).forEach(k => {
-      if (k.startsWith('plan_') || k.startsWith('analytics_month_')) {
-        try { data[k] = JSON.parse(localStorage.getItem(k) ?? '') } catch {}
-      }
-    })
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `sila-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    setToast(false)
+    setSaving(true)
+    try {
+      await savePlanRemote(year, month, newPlan)
+      saveToLocal(year, month, newPlan)
+      setPlan(newPlan)
+      setEditing(false)
+      setToast(true)
+      setTimeout(() => setToast(false), 5000)
+      loadPlans()
+    } catch {
+      saveToLocal(year, month, newPlan)
+      setPlan(newPlan)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -161,22 +175,14 @@ export default function PlanBlock({ totalRevenue }: Props) {
   }
 
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: 16,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
-      padding: 20,
-    }}>
+    <div style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, boxShadow: '0 4px 24px rgba(0,0,0,0.4)', padding: 20 }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="font-semibold" style={{ color: '#f0f0ff', letterSpacing: '0.05em' }}>
             План на {monthLabel}
           </h2>
-          {hasPlan && !editing && (
+          {plan && !editing && (
             <p style={{ fontSize: 12, color: '#8888aa', marginTop: 2 }}>
               Реальный: {formatRub(plan.real)} · Позитивный: {formatRub(plan.positive)}
             </p>
@@ -184,19 +190,29 @@ export default function PlanBlock({ totalRevenue }: Props) {
         </div>
         <button
           onClick={openForm}
-          style={{
-            fontSize: 13, padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
-            border: '1px solid rgba(124,58,237,0.5)', color: '#a855f7', background: 'transparent',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.1)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          disabled={loading}
+          style={{ fontSize: 13, padding: '6px 14px', borderRadius: 8, cursor: loading ? 'default' : 'pointer', border: '1px solid rgba(124,58,237,0.5)', color: '#a855f7', background: 'transparent', opacity: loading ? 0.5 : 1 }}
+          onMouseEnter={e => { if (!loading) (e.currentTarget.style.background = 'rgba(124,58,237,0.1)') }}
+          onMouseLeave={e => { (e.currentTarget.style.background = 'transparent') }}
         >
-          {hasPlan ? 'Изменить план' : 'Установить план'}
+          {plan ? 'Изменить план' : 'Установить план'}
         </button>
       </div>
 
+      {/* Network error banner */}
+      {networkError && !loading && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b' }}>
+          Не удалось загрузить план. Используются локальные данные.
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <p style={{ color: '#8888aa', fontSize: 13 }}>Загрузка плана...</p>
+      )}
+
       {/* Inline form */}
-      {editing && (
+      {!loading && editing && (
         <div className="mb-4 p-4 rounded-xl" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)' }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <div>
@@ -215,8 +231,8 @@ export default function PlanBlock({ totalRevenue }: Props) {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} style={{ padding: '7px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', background: 'linear-gradient(135deg,#7c3aed,#a855f7)', color: 'white', border: 'none' }}>
-              Сохранить
+            <button onClick={handleSave} disabled={saving} style={{ padding: '7px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: saving ? 'default' : 'pointer', background: 'linear-gradient(135deg,#7c3aed,#a855f7)', color: 'white', border: 'none', opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Сохранение...' : 'Сохранить'}
             </button>
             <button onClick={() => setEditing(false)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 14, cursor: 'pointer', background: 'transparent', color: '#8888aa', border: '1px solid rgba(255,255,255,0.1)' }}>
               Отмена
@@ -226,47 +242,28 @@ export default function PlanBlock({ totalRevenue }: Props) {
       )}
 
       {/* No plan placeholder */}
-      {!hasPlan && !editing && (
+      {!loading && !plan && !editing && (
         <p style={{ color: '#8888aa', fontSize: 13 }}>
           План не установлен — нажмите &laquo;Установить план&raquo;
         </p>
       )}
 
       {/* Progress bars */}
-      {hasPlan && !editing && (
+      {!loading && plan && !editing && (
         <div className="flex gap-4 flex-col md:flex-row">
-          <PlanCard
-            label="Реальный план"
-            plan={plan.real}
-            revenue={totalRevenue}
+          <PlanCard label="Реальный план" plan={plan.real} revenue={totalRevenue}
             completionPct={plan.real > 0 ? totalRevenue / plan.real * 100 : 0}
-            daysElapsedPct={daysElapsedPct}
-            today={today}
-            daysInMonth={daysInMonth}
-          />
-          <PlanCard
-            label="Позитивный план"
-            plan={plan.positive}
-            revenue={totalRevenue}
+            daysElapsedPct={daysElapsedPct} today={today} daysInMonth={daysInMonth} />
+          <PlanCard label="Позитивный план" plan={plan.positive} revenue={totalRevenue}
             completionPct={plan.positive > 0 ? totalRevenue / plan.positive * 100 : 0}
-            daysElapsedPct={daysElapsedPct}
-            today={today}
-            daysInMonth={daysInMonth}
-          />
+            daysElapsedPct={daysElapsedPct} today={today} daysInMonth={daysInMonth} />
         </div>
       )}
 
-      {/* Backup reminder toast */}
+      {/* Save success toast */}
       {toast && (
-        <div style={{
-          marginTop: 12, padding: '10px 14px', borderRadius: 10, fontSize: 13,
-          background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)',
-          color: '#22c55e', display: 'flex', alignItems: 'center', gap: 10,
-        }}>
-          <span>План сохранён ✓ &nbsp;Совет: сделайте экспорт для резервной копии.</span>
-          <button onClick={handleExport} style={{ fontSize: 12, color: '#a855f7', background: 'none', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 6, padding: '2px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            Экспорт
-          </button>
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, fontSize: 13, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span>План сохранён в Google Sheets ✓</span>
           <button onClick={() => setToast(false)} style={{ marginLeft: 'auto', fontSize: 16, color: '#8888aa', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
       )}
