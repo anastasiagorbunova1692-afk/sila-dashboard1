@@ -7,21 +7,20 @@ import type { DashboardRow } from '@/lib/sheets'
 import { formatRub, formatNum } from '@/lib/formatters'
 
 interface Props {
-  /** All rows from the Dashboard sheet (all months). */
   allData: DashboardRow[]
 }
 
 interface MonthEntry {
-  key: string         // "2025-10"
-  label: string       // "окт 2025"
+  key: string
+  label: string
   year: number
-  month: number       // 0-indexed
+  month: number  // 0-indexed
   isCurrent: boolean
-  revenue: number | null
-  avgPerDay: number | null
+  revenueMtd: number | null    // days 1..currentDay
+  revenueFull: number | null   // all days (past) or same as MTD (current)
+  avgPerDay: number | null     // revenueFull / daysInMonth (past) or mtd / currentDay (current)
   races: number | null
   clients: number | null
-  daysIncluded: number
 }
 
 const MONTH_LABELS: Record<number, string> = {
@@ -40,7 +39,6 @@ function buildMonthData(rows: DashboardRow[]): MonthEntry[] {
   const currentMonth = today.getMonth() // 0-indexed
   const currentDay = today.getDate()
 
-  // Group all rows by year+month
   const groups = new Map<string, DashboardRow[]>()
   for (const r of rows) {
     if (!r.date) continue
@@ -54,29 +52,30 @@ function buildMonthData(rows: DashboardRow[]): MonthEntry[] {
   for (const key of Array.from(groups.keys())) {
     const allMonthRows = groups.get(key)!
     const [y, m] = key.split('-').map(Number)
-    const monthIdx = m - 1 // 0-indexed
+    const monthIdx = m - 1
     const isCurrent = y === currentYear && monthIdx === currentMonth
 
-    let activeRows: DashboardRow[]
-    let avgDivisor: number
+    const mtdRows = allMonthRows.filter((r) => {
+      const day = parseInt(r.date.split('-')[2], 10)
+      return day <= currentDay
+    })
 
-    if (isCurrent) {
-      // MTD: only days 1..today
-      activeRows = allMonthRows.filter((r) => {
-        const day = parseInt(r.date.split('-')[2], 10)
-        return day <= currentDay
-      })
-      avgDivisor = currentDay
-    } else {
-      // Past month: use ALL days
-      activeRows = allMonthRows
-      avgDivisor = new Date(y, m, 0).getDate() // daysInMonth
-    }
+    const sumRev = (rs: DashboardRow[]) => rs.reduce((s, r) => s + (r.revenue ?? 0), 0)
+    const sumRaces = (rs: DashboardRow[]) => rs.reduce((s, r) => s + (r.races ?? 0), 0)
+    const sumClients = (rs: DashboardRow[]) => rs.reduce((s, r) => s + (r.clients ?? 0), 0)
 
-    const rev = activeRows.reduce((s, r) => s + (r.revenue ?? 0), 0)
-    const rac = activeRows.reduce((s, r) => s + (r.races ?? 0), 0)
-    const cli = activeRows.reduce((s, r) => s + (r.clients ?? 0), 0)
-    const hasData = activeRows.length > 0
+    const hasMtd = mtdRows.length > 0
+    const hasAll = allMonthRows.length > 0
+
+    const revMtd = hasMtd ? sumRev(mtdRows) : null
+    const revFull = isCurrent
+      ? revMtd  // month not finished — full = MTD
+      : (hasAll ? sumRev(allMonthRows) : null)
+
+    const daysInMonth = new Date(y, m, 0).getDate()
+    const avgPerDay = isCurrent
+      ? (revMtd !== null ? revMtd / currentDay : null)
+      : (revFull !== null ? revFull / daysInMonth : null)
 
     result.push({
       key,
@@ -84,15 +83,14 @@ function buildMonthData(rows: DashboardRow[]): MonthEntry[] {
       year: y,
       month: monthIdx,
       isCurrent,
-      revenue: hasData ? rev : null,
-      avgPerDay: hasData && avgDivisor > 0 ? rev / avgDivisor : null,
-      races: hasData ? rac : null,
-      clients: hasData ? cli : null,
-      daysIncluded: activeRows.length,
+      revenueMtd: revMtd,
+      revenueFull: revFull,
+      avgPerDay,
+      races: hasMtd ? sumRaces(mtdRows) : null,
+      clients: hasMtd ? sumClients(mtdRows) : null,
     })
   }
 
-  // Sort chronologically, newest first
   return result.sort((a, b) => b.key.localeCompare(a.key))
 }
 
@@ -102,20 +100,28 @@ function pctDiff(curr: number | null, prev: number | null): string | null {
   return (p >= 0 ? '+' : '') + p.toFixed(1) + '%'
 }
 
+const TH_STYLE: React.CSSProperties = {
+  color: '#8888aa',
+  fontSize: 11,
+  letterSpacing: '0.1em',
+  position: 'sticky',
+  top: 0,
+  zIndex: 10,
+  background: '#0d0d1a',
+  backdropFilter: 'blur(10px)',
+}
+
 export default function MtdBlock({ allData }: Props) {
   const today = new Date()
   const currentDay = today.getDate()
 
   const months = buildMonthData(allData)
-
   if (months.length === 0) return null
 
-  // Chart data (oldest → newest for left-to-right)
   const chartData = [...months].reverse().map((m) => ({
     label: m.label,
-    revenue: m.revenue ?? 0,
+    revenue: m.revenueFull ?? 0,
     isCurrent: m.isCurrent,
-    days: m.daysIncluded,
   }))
 
   return (
@@ -135,10 +141,9 @@ export default function MtdBlock({ allData }: Props) {
         MTD — сравнение по месяцам
       </h2>
       <p className="text-xs mb-5" style={{ color: '#8888aa' }}>
-        Текущий месяц: данные с 1-го по {currentDay}-е число. Прошлые месяцы: полная выручка.
+        MTD = данные с 1-го по {currentDay}-е число. Прошлые месяцы также показывают полную выручку.
       </p>
 
-      {/* Table — max 5 rows visible, rest scrollable */}
       <div
         className="overflow-x-auto mb-1"
         style={{
@@ -151,12 +156,8 @@ export default function MtdBlock({ allData }: Props) {
         <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              {['Месяц', 'Выручка', 'Ср. день', 'Заездов', 'Клиентов', 'vs пред. месяц'].map((h) => (
-                <th
-                  key={h}
-                  className="text-left font-medium py-2 pr-6 uppercase"
-                  style={{ color: '#8888aa', fontSize: 11, letterSpacing: '0.1em', position: 'sticky', top: 0, zIndex: 10, background: '#0d0d1a', backdropFilter: 'blur(10px)' }}
-                >
+              {(['Месяц', 'Выручка MTD', 'Выручка полная', 'Ср. день', 'Заездов', 'Клиентов', 'vs пред. месяц'] as string[]).map((h) => (
+                <th key={h} className="text-left font-medium py-2 pr-6 uppercase" style={TH_STYLE}>
                   {h}
                 </th>
               ))}
@@ -165,7 +166,7 @@ export default function MtdBlock({ allData }: Props) {
           <tbody>
             {months.map((m, i) => {
               const prev = months[i + 1] ?? null
-              const diff = pctDiff(m.revenue, prev?.revenue ?? null)
+              const diff = pctDiff(m.revenueMtd, prev?.revenueMtd ?? null)
               const diffUp = diff !== null && diff.startsWith('+')
 
               return (
@@ -185,7 +186,14 @@ export default function MtdBlock({ allData }: Props) {
                     {m.isCurrent && <span className="ml-2 text-xs font-normal" style={{ color: '#8888aa' }}>текущий</span>}
                   </td>
                   <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>
-                    {m.revenue !== null ? formatRub(m.revenue) : '—'}
+                    {m.revenueMtd !== null ? formatRub(m.revenueMtd) : '—'}
+                  </td>
+                  <td className="py-2.5 pr-6" style={{ color: m.isCurrent ? '#8888aa' : '#f0f0ff' }}>
+                    {m.revenueFull !== null
+                      ? m.isCurrent
+                        ? formatRub(m.revenueFull) + ' (в процессе)'
+                        : formatRub(m.revenueFull)
+                      : '—'}
                   </td>
                   <td className="py-2.5 pr-6" style={{ color: '#8888aa' }}>
                     {formatAvg(m.avgPerDay)}
@@ -206,7 +214,6 @@ export default function MtdBlock({ allData }: Props) {
         </table>
       </div>
 
-      {/* "More months" hint */}
       {months.length > 5 && (
         <p className="text-xs mb-5" style={{ color: '#8888aa' }}>
           ↓ ещё {months.length - 5} {months.length - 5 === 1 ? 'месяц' : months.length - 5 < 5 ? 'месяца' : 'месяцев'}
@@ -214,17 +221,11 @@ export default function MtdBlock({ allData }: Props) {
       )}
       {months.length <= 5 && <div className="mb-5" />}
 
-      {/* Bar chart */}
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fill: '#8888aa', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
+            <XAxis dataKey="label" tick={{ fill: '#8888aa', fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis
               tick={{ fill: '#8888aa', fontSize: 11 }}
               axisLine={false}
@@ -236,16 +237,9 @@ export default function MtdBlock({ allData }: Props) {
               }
             />
             <Tooltip
-              contentStyle={{
-                background: 'rgba(13,13,26,0.95)',
-                border: '1px solid rgba(124,58,237,0.3)',
-                borderRadius: 10,
-              }}
+              contentStyle={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10 }}
               labelStyle={{ color: '#8888aa', fontSize: 12 }}
-              formatter={(value: number, _: string, entry) => [
-                `${formatRub(value)} (${(entry.payload as { days: number }).days} дн.)`,
-                'Выручка',
-              ]}
+              formatter={(value: number) => [formatRub(value), 'Выручка полная']}
             />
             <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, index) => (
