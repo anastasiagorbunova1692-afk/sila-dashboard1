@@ -123,7 +123,7 @@ export default function MtdBlock({ allData }: Props) {
         <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              {['Месяц', 'Выручка MTD', 'Заездов MTD', 'Клиентов MTD', 'vs пред. месяц'].map((h) => (
+              {['Месяц', 'Выручка MTD', 'Ср. выручка/день', 'Заездов MTD', 'Клиентов MTD', 'vs пред. месяц'].map((h) => (
                 <th
                   key={h}
                   className="text-left font-medium py-2 pr-6 uppercase"
@@ -159,6 +159,11 @@ export default function MtdBlock({ allData }: Props) {
                   </td>
                   <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>
                     {m.revenue !== null ? formatRub(m.revenue) : '—'}
+                  </td>
+                  <td className="py-2.5 pr-6" style={{ color: isCurrent ? '#a855f7' : '#f0f0ff' }}>
+                    {m.revenue !== null && m.revenue > 0
+                      ? Math.round(m.revenue / currentDay).toLocaleString('ru') + ' ₽/д'
+                      : '—'}
                   </td>
                   <td className="py-2.5 pr-6" style={{ color: '#f0f0ff' }}>
                     {m.races !== null ? formatNum(m.races) : '—'}
