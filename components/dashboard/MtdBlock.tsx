@@ -16,6 +16,7 @@ interface MonthEntry {
   year: number
   month: number  // 0-indexed
   isCurrent: boolean
+  isFuture: boolean
   revenueMtd: number | null    // days 1..currentDay
   revenueFull: number | null   // all days (past) or same as MTD (current)
   avgPerDay: number | null     // revenueFull / daysInMonth (past) or mtd / currentDay (current)
@@ -54,6 +55,7 @@ function buildMonthData(rows: DashboardRow[]): MonthEntry[] {
     const [y, m] = key.split('-').map(Number)
     const monthIdx = m - 1
     const isCurrent = y === currentYear && monthIdx === currentMonth
+    const isFuture = y > currentYear || (y === currentYear && monthIdx > currentMonth)
 
     const mtdRows = allMonthRows.filter((r) => {
       const day = parseInt(r.date.split('-')[2], 10)
@@ -83,6 +85,7 @@ function buildMonthData(rows: DashboardRow[]): MonthEntry[] {
       year: y,
       month: monthIdx,
       isCurrent,
+      isFuture,
       revenueMtd: revMtd,
       revenueFull: revFull,
       avgPerDay,
@@ -120,8 +123,9 @@ export default function MtdBlock({ allData }: Props) {
 
   const chartData = [...months].reverse().map((m) => ({
     label: m.label,
-    revenue: m.revenueFull ?? 0,
+    revenue: m.revenueMtd ?? 0,
     isCurrent: m.isCurrent,
+    isFuture: m.isFuture,
   }))
 
   return (
@@ -239,11 +243,11 @@ export default function MtdBlock({ allData }: Props) {
             <Tooltip
               contentStyle={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10 }}
               labelStyle={{ color: '#8888aa', fontSize: 12 }}
-              formatter={(value: number) => [formatRub(value), 'Выручка полная']}
+              formatter={(value: number) => [formatRub(value), 'Выручка MTD']}
             />
             <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, index) => (
-                <Cell key={index} fill={entry.isCurrent ? '#a855f7' : '#7c3aed'} />
+                <Cell key={index} fill={entry.isCurrent ? '#a855f7' : entry.isFuture ? 'rgba(124,58,237,0.2)' : '#7c3aed'} />
               ))}
             </Bar>
           </BarChart>
