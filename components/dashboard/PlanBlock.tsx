@@ -42,9 +42,10 @@ function saveToLocal(year: number, month: number, plan: Plan) {
 
 async function fetchPlans(): Promise<Record<string, Plan>> {
   const res = await fetch(API_URL + '?t=' + Date.now())
-  const data = await res.json() as { plans?: Record<string, { realPlan: number; positivePlan: number }> }
+  const data = await res.json() as { success?: boolean; plans?: Record<string, { realPlan: number; positivePlan: number }> }
+  if (data.success === false || !data.plans) throw new Error('no data')
   const plans: Record<string, Plan> = {}
-  for (const [k, v] of Object.entries(data.plans ?? {})) {
+  for (const [k, v] of Object.entries(data.plans)) {
     plans[k] = { real: v.realPlan, positive: v.positivePlan }
   }
   return plans
@@ -111,7 +112,6 @@ export default function PlanBlock({ totalRevenue }: Props) {
 
   const [plan, setPlan] = useState<Plan | null>(null)
   const [loading, setLoading] = useState(true)
-  const [networkError, setNetworkError] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [realInput, setRealInput] = useState('')
@@ -120,7 +120,6 @@ export default function PlanBlock({ totalRevenue }: Props) {
 
   const loadPlans = useCallback(async () => {
     setLoading(true)
-    setNetworkError(false)
     try {
       const plans = await fetchPlans()
       const p = plans[key] ?? null
@@ -131,7 +130,7 @@ export default function PlanBlock({ totalRevenue }: Props) {
         setPlan(null)
       }
     } catch {
-      setNetworkError(true)
+      // silently fall back to localStorage
       setPlan(loadFromLocal(year, month))
     } finally {
       setLoading(false)
@@ -199,13 +198,6 @@ export default function PlanBlock({ totalRevenue }: Props) {
           {plan ? 'Изменить план' : 'Установить план'}
         </button>
       </div>
-
-      {/* Network error banner */}
-      {networkError && !loading && (
-        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b' }}>
-          Не удалось загрузить план. Используются локальные данные.
-        </div>
-      )}
 
       {/* Loading */}
       {loading && (
