@@ -70,8 +70,13 @@ export default function DashboardPage() {
     : null
 
   const TRACK_CAPACITY = 180
-  const today = new Date().getDate()
+  const todayDate = new Date()
+  const today = todayDate.getDate()
+  const daysInMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0).getDate()
+  const MONTH_NAMES_SHORT = ['январе','феврале','марте','апреле','мае','июне','июле','августе','сентябре','октябре','ноябре','декабре']
+  const monthNamePre = MONTH_NAMES_SHORT[todayDate.getMonth()]
   const avgRevenuePerDay = today > 0 ? totalRevenue / today : null
+  const expectedRevenue = avgRevenuePerDay !== null ? avgRevenuePerDay * daysInMonth : null
   const avgLoad = today > 0 && totalRacesCount > 0
     ? parseFloat((totalRacesCount / (TRACK_CAPACITY * today) * 100).toFixed(1))
     : null
@@ -87,6 +92,12 @@ export default function DashboardPage() {
       label: 'Выручка / день',
       value: avgRevenuePerDay !== null ? formatRubShort(avgRevenuePerDay) : '—',
       subValue: `среднее за ${today} дней`,
+    },
+    {
+      label: 'Ожидаемая выручка',
+      value: expectedRevenue !== null ? formatRubShort(expectedRevenue) : '—',
+      subValue: `прогноз на ${monthNamePre}`,
+      color: '#f59e0b',
     },
     {
       label: 'Выручка заезды',
