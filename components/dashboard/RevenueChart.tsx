@@ -36,29 +36,28 @@ export default function RevenueChart({ data }: Props) {
         padding: 20,
       }}
     >
-      <h2
-        className="font-semibold mb-4"
-        style={{ color: '#f0f0ff', letterSpacing: '0.05em' }}
-      >
+      <h2 className="font-semibold mb-4" style={{ color: '#f0f0ff', letterSpacing: '0.05em' }}>
         Выручка по дням
       </h2>
-      <div className="h-56">
+      {/* Responsive height: 200px on mobile, 224px on desktop */}
+      <div style={{ height: 'clamp(180px, 30vw, 224px)' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
-              tick={{ fill: '#8888aa', fontSize: 11 }}
+              tick={{ fill: '#8888aa', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
-              interval="preserveStartEnd"
+              // Show every 5th label to avoid crowding on mobile
+              interval={4}
             />
             <YAxis
-              tick={{ fill: '#8888aa', fontSize: 11 }}
+              tick={{ fill: '#8888aa', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => v >= 1000000 ? (v / 1000000).toFixed(1) + 'М' : v >= 1000 ? (v / 1000).toFixed(0) + 'К' : v}
-              width={50}
+              width={44}
             />
             <Tooltip
               contentStyle={TOOLTIP_STYLE}
@@ -84,7 +83,7 @@ export default function RevenueChart({ data }: Props) {
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex flex-wrap gap-4 mt-3">
+      <div className="flex flex-wrap gap-3 mt-3">
         {[
           { color: '#7c3aed', label: 'Общая' },
           { color: '#a855f7', label: 'Заезды' },
@@ -93,7 +92,7 @@ export default function RevenueChart({ data }: Props) {
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-0.5 rounded" style={{ background: color }} />
-            <span className="text-xs" style={{ color: '#8888aa' }}>{label}</span>
+            <span style={{ color: '#8888aa', fontSize: 11 }}>{label}</span>
           </div>
         ))}
       </div>

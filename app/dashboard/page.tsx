@@ -144,7 +144,7 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen" style={{ background: '#080810' }}>
       <Sidebar />
-      <main className="flex-1 md:ml-[220px] p-5 md:p-8 relative z-10">
+      <main className="flex-1 md:ml-[220px] p-3 pt-16 md:pt-5 md:p-8 relative z-10 overflow-x-hidden">
         <Header
           title="SILA Картинг — Текущий месяц"
           updatedAt={updatedAt}

@@ -362,7 +362,7 @@ export default function AnalyticsPage() {
   return (
     <div className="flex min-h-screen" style={{ background: '#080810' }}>
       <Sidebar />
-      <main className="flex-1 md:ml-[220px] p-5 md:p-8 relative z-10">
+      <main className="flex-1 md:ml-[220px] p-3 pt-16 md:pt-5 md:p-8 relative z-10 overflow-x-hidden">
         <Header title="SILA Картинг — Аналитика" updatedAt={null} onRefresh={refresh} loading={false} />
 
         {/* Tabs */}
@@ -408,7 +408,7 @@ export default function AnalyticsPage() {
               </div>
 
               {/* Top cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <TopCard label="Выручка" value={last?.revenue ?? ''} prev={prev?.revenue} valueStr={fmt(last?.revenue ?? '', formatRub)} />
                 <TopCard label="EBITDA" value={last?.ebitda ?? ''} prev={prev?.ebitda} valueStr={fmt(last?.ebitda ?? '', formatRub)} />
                 <TopCard label="Маржа EBITDA" value={last?.ebitdaMargin ?? ''} prev={prev?.ebitdaMargin}
@@ -432,7 +432,7 @@ export default function AnalyticsPage() {
                     ))}
                   </div>
                 </div>
-                <div className="h-52">
+                <div style={{ height: 'clamp(180px, 30vw, 208px)' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                       <CartesianGrid stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" vertical={false} />

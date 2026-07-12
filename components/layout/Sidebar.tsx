@@ -17,8 +17,14 @@ export default function Sidebar() {
     <>
       {/* Mobile hamburger */}
       <button
-        className="fixed top-4 left-4 z-50 md:hidden flex flex-col gap-1.5 p-2 rounded-xl"
-        style={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+        className="fixed top-3 left-3 z-50 md:hidden flex flex-col gap-1.5 rounded-xl"
+        style={{
+          background: 'rgba(13,13,26,0.95)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          minHeight: 44, minWidth: 44,
+          padding: '10px 11px',
+          justifyContent: 'center', alignItems: 'center',
+        }}
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label="Меню"
       >
@@ -29,7 +35,11 @@ export default function Sidebar() {
 
       {/* Overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-30 bg-black/70 md:hidden" onClick={() => setMobileOpen(false)} />
+        <div
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setMobileOpen(false)}
+        />
       )}
 
       {/* Sidebar */}
@@ -70,17 +80,26 @@ export default function Sidebar() {
                 key={href}
                 href={href}
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative"
-                style={active ? {
-                  background: 'rgba(124,58,237,0.15)',
-                  color: '#a855f7',
-                  borderLeft: '2px solid #7c3aed',
-                  paddingLeft: 10,
-                } : {
-                  color: '#8888aa',
+                className="flex items-center gap-3 px-3 rounded-lg text-sm font-medium transition-all duration-200"
+                style={Object.assign(
+                  { minHeight: 44, display: 'flex', alignItems: 'center' },
+                  active ? {
+                    background: 'rgba(124,58,237,0.15)',
+                    color: '#a855f7',
+                    borderLeft: '2px solid #7c3aed',
+                    paddingLeft: 10,
+                  } : { color: '#8888aa' }
+                )}
+                onMouseEnter={e => {
+                  if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.1)'
+                  ;(e.currentTarget as HTMLElement).style.color = '#f0f0ff'
                 }}
-                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.1)'; (e.currentTarget as HTMLElement).style.color = '#f0f0ff' }}
-                onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#8888aa' } }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent'
+                    ;(e.currentTarget as HTMLElement).style.color = '#8888aa'
+                  }
+                }}
               >
                 <span>{icon}</span>
                 <span>{label}</span>
@@ -109,7 +128,7 @@ export default function Sidebar() {
                 URL.revokeObjectURL(url)
               }}
               title="Экспорт всех данных"
-              style={{ fontSize: 11, color: '#8888aa', background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', flex: 1 }}
+              style={{ fontSize: 11, color: '#8888aa', background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', flex: 1, minHeight: 36 }}
               onMouseEnter={e => (e.currentTarget.style.color = '#a855f7')}
               onMouseLeave={e => (e.currentTarget.style.color = '#8888aa')}
             >
@@ -117,7 +136,7 @@ export default function Sidebar() {
             </button>
             <label
               title="Импорт данных из файла"
-              style={{ fontSize: 11, color: '#8888aa', background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', flex: 1, textAlign: 'center' }}
+              style={{ fontSize: 11, color: '#8888aa', background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', flex: 1, textAlign: 'center', minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#a855f7')}
               onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = '#8888aa')}
             >
